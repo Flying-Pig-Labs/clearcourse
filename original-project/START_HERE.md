@@ -17,7 +17,7 @@ Open http://localhost:8000 in your browser. The bundled GIS snapshot is included
     npm run lint
     npm run format:check
     npm i -D playwright && npx playwright install chromium
-    npm run test:ui      # 17 browser tests
+    npm run test:ui      # 18 browser tests
 
 ## Contents
 

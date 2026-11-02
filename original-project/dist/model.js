@@ -5,13 +5,18 @@
     officers: [1, 1, 2, 3],
     barriers: [1, 1, 2, 3],
     weights: [1, 2, 4, 7],
+    // Billed dollars per officer-hour. Under PD-119SPE the City bills 1.5 × each officer's personal rate;
+    // $85 is an illustrative placeholder until real invoices calibrate it.
     rate: 85,
     setup: 45,
     clear: 20,
     wave: 15,
     fast: 4,
     slow: 12,
-    minimumShift: 0,
+    // Richmond PD agreements PD-119SPE ¶13 and PD-119SE §19: each officer bills at least four hours.
+    minimumShift: 4,
+    // 'rpd': started hours past 15 minutes bill as full hours (PD-119SPE ¶18). 'exact': modeled hours.
+    billing: 'rpd',
     mode: 'full',
     start: '08:00',
     turnWeight: 1,
@@ -32,6 +37,26 @@
   // Certified courses are measured 0.30 m from the curb on the shortest possible route.
   const RUNNER_OFFSET = 0.3;
   const CLASS_PENALTY = [0, 0.25, 0.7, 1.5];
+  // Richmond PD extra-duty agreements (rva.gov forms, verified 2026-11-02).
+  const RPD = {
+    specialEventOfficers: 10,
+    special: { form: 'PD-119SPE', revised: '06/09/2025', lead: '30 calendar days' },
+    single: { form: 'PD-119SE', revised: '07/14/2025', lead: '7 working days' },
+    graceHours: 0.25,
+  };
+  // Hours billed for one officer on duty for `hours`.
+  function billedHours(hours, settings = DEFAULTS) {
+    const p = { ...DEFAULTS, ...settings },
+      minimum = Number(p.minimumShift) || 0;
+    if (p.billing === 'exact') return Math.max(minimum, hours);
+    const whole = Math.floor(hours + 1e-9),
+      rounded = whole + (hours - whole > RPD.graceHours + 1e-9 ? 1 : 0);
+    return Math.max(minimum, rounded);
+  }
+  // Which Richmond PD agreement applies to a plan with this many officers.
+  function rpdAgreement(officers) {
+    return officers >= RPD.specialEventOfficers ? RPD.special : RPD.single;
+  }
   const REUSE_PENALTY = 2.8;
   const COS_45 = Math.SQRT1_2;
 
@@ -428,7 +453,8 @@
       s.control = p.mode === 'full' ? 0 : Math.min(...s.km) * p.fast;
       s.release = s.end - p.clear;
       s.officerHours = s.officers * s.hours;
-      s.paidHours = s.officers * Math.max(s.hours, p.minimumShift);
+      s.billedHoursEach = billedHours(s.hours, p);
+      s.paidHours = s.officers * s.billedHoursEach;
       s.startTime = startMinutes + s.begin;
       s.endTime = startMinutes + s.end;
       rawIndex += s.points;
@@ -450,6 +476,10 @@
       current += d;
       peak = Math.max(peak, current);
     }
+    // Headcount if every post keeps its own officers. `peak` is the lower bound if officers could
+    // move between posts instantly. For 5K and 10K courses the two are equal: no post closes before
+    // another opens.
+    const officers = sites.reduce((sum, s) => sum + s.officers, 0);
     let turns = 0,
       changes = 0;
     for (let i = 1; i < route.edges.length; i++) {
@@ -475,7 +505,9 @@
       alleyMouths,
       alleyBarricades,
       freewayConnections: sites.filter((s) => s.limitedAccess).length,
+      officers,
       peak,
+      agreement: rpdAgreement(officers),
       cost: paidHours * p.rate,
       turns,
       changes,
@@ -596,7 +628,7 @@
       (r) =>
         Math.abs(measure(r) - target) / target <= tolerance &&
         required.every((name) => r.edges.some((e) => norm(net.data.edges[e].n) === name)) &&
-        (constraints.maxPeak == null || r.score.peak <= constraints.maxPeak)
+        (constraints.maxPeak == null || r.score.officers <= constraints.maxPeak)
     );
     if (!pool.length)
       throw new Error(
@@ -1020,13 +1052,16 @@
   function lonlat(x, y) {
     return [x / 88152 - 77.46, 37.56 - y / 111195];
   }
-  const VERSION = '3.0';
+  const VERSION = '4.0';
   const api = {
     VERSION,
     Heap,
     DEFAULTS,
     CLASSES,
     LIMITED_ACCESS_CLASS,
+    RPD,
+    billedHours,
+    rpdAgreement,
     createNetwork,
     evaluate,
     generate,

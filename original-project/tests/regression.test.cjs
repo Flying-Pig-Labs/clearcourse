@@ -218,6 +218,107 @@ function fixture() {
   });
   for (const r of shortest) assert.ok(Math.abs(r.score.shortestRoute - 5000) / 5000 <= 0.02, r.name);
 
+  // 8. Richmond PD billing: 4-hour minimum, started hours bill in full past 15 minutes, agreement by headcount.
+  assert.equal(M.billedHours(2.34), 4);
+  assert.equal(M.billedHours(4.2), 4, '12 minutes past the hour is within the 15-minute grace');
+  assert.equal(M.billedHours(4.3), 5, '18 minutes past the hour bills a full hour');
+  assert.equal(M.billedHours(5), 5);
+  assert.equal(M.billedHours(4.3, { billing: 'exact' }), 4.3);
+  assert.equal(M.billedHours(2.34, { billing: 'exact' }), 4, 'The minimum still applies to modeled hours');
+  assert.equal(M.billedHours(0.3, { minimumShift: 0 }), 1);
+  assert.equal(M.rpdAgreement(10).form, 'PD-119SPE');
+  assert.equal(M.rpdAgreement(9).form, 'PD-119SE');
+  {
+    const sc = M.evaluate(net, five);
+    assert.equal(
+      sc.officers,
+      sc.sites.reduce((a, s) => a + s.officers, 0)
+    );
+    const expected = sc.sites.reduce((a, s) => a + s.officers * M.billedHours(s.hours), 0) * M.DEFAULTS.rate;
+    assert.ok(Math.abs(sc.cost - expected) < 1e-6);
+    assert.equal(sc.agreement.form, 'PD-119SPE');
+  }
+  // The UI says moving officers cannot help at 5K and 10K: no post closes before another opens.
+  for (const s of D.seeds)
+    for (const km of [5, 10]) {
+      const r = (await M.generate(net, { start: startOf(s), target: km * 1000 }))[0];
+      const sc = M.evaluate(net, r, { ...M.DEFAULTS, mode: 'rolling' });
+      assert.equal(sc.peak, sc.officers, `${s.name} ${km}K rolling`);
+    }
+
+  // 9. Share links round-trip and reject broken routes.
+  {
+    const payload = { v: 2, routes: [{ s: five.nodes[0], e: five.edges }], note: 'Léon & "quotes"' };
+    const token = await P.packShare(payload);
+    assert.deepEqual(await P.unpackShare(token), payload);
+    assert.deepEqual(P.routeFromEdges(D, five.nodes[0], five.edges).nodes, five.nodes);
+    assert.throws(() => P.routeFromEdges(D, five.nodes[0], [five.edges[3]]), /does not connect/);
+    await assert.rejects(P.unpackShare('z' + token.slice(5)), /damaged/);
+  }
+
+  // 10. Directed access: a one-way street into a pocket whose only exit is the course traps cars.
+  {
+    const d = {
+      nodes: [
+        [0, 0],
+        [100, 0],
+        [100, 100],
+        [0, 100],
+        [200, 100],
+        [200, 0],
+      ],
+      edges: [],
+      facilities: [],
+    };
+    const add = (a, b, n, extra = {}) =>
+      d.edges.push({ a, b, c: 0, n, l: 100, p: [d.nodes[a], d.nodes[b]], publicRoad: true, ...extra });
+    add(0, 1, 'A');
+    add(1, 2, 'B');
+    add(2, 3, 'C');
+    add(3, 0, 'D');
+    add(2, 4, 'Into pocket', { oneWay: 'FT' });
+    add(4, 5, 'Pocket');
+    add(5, 1, 'Course');
+    const n1 = M.createNetwork(d);
+    const result = P.screenAccess(n1, { nodes: [5, 1], edges: [6], length: 100 });
+    assert.equal(result.directed.trapped, 1, 'Node 4 can be entered but not left');
+    assert.equal(result.isolatedNodes, 0, 'The undirected check misses it');
+  }
+  // 11. Fire/EMS travel time: closing the short link forces a 2 km detour (> 2 minutes at 25 mph).
+  {
+    const d = {
+      nodes: [
+        [0, 0],
+        [100, 0],
+        [200, 0],
+        [0, 1000],
+        [200, 1000],
+        [300, 0],
+      ],
+      edges: [],
+      facilities: [{ p: [0, 0], name: 'Test station', kind: 'Fire' }],
+    };
+    const add = (a, b, l) =>
+      d.edges.push({ a, b, c: 0, n: 'S' + a + b, l, p: [d.nodes[a], d.nodes[b]], publicRoad: true });
+    add(0, 1, 100);
+    add(1, 2, 100);
+    add(0, 3, 1000);
+    add(3, 4, 200);
+    add(4, 2, 800);
+    add(2, 5, 100);
+    const n1 = M.createNetwork(d);
+    const result = P.screenAccess(n1, { nodes: [1, 2], edges: [1], length: 100 });
+    assert.equal(result.response.stations, 1);
+    assert.equal(result.response.slower, 1, 'Node 5 is reached 1,800 m later');
+    assert.ok(Math.abs(result.response.worst - 1800 / (25 * 0.44704)) < 1e-6);
+  }
+  {
+    const t = Date.now(),
+      a = P.screenAccess(net, five);
+    assert.ok(Date.now() - t < 2000, 'Access screen stays interactive');
+    assert.ok(a.response.stations >= 10, 'Fire and EMS stations snap to the network');
+  }
+
   console.log('All regression tests passed.');
 })().catch((e) => {
   console.error(e);

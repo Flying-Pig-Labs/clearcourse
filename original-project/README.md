@@ -7,13 +7,15 @@ A browser-local exploratory prototype for discussing race-route closures and sta
 - A bundled, pannable Richmond vector street map with DPW street geometry and functional classes.
 - Approximate 5K, 10K and custom-distance street-loop candidates, using a chosen start area or a point on the map.
 - Three route preferences that search differently: balanced, smaller streets, and fewer turns.
-- Separate measurements for peak officers, staffing cost, officer-hours, a relative burden index, route distance, turns and repeated street distance.
+- Separate measurements for officers needed, billed officer-hours and staffing cost under Richmond PD's billing rules, a relative burden index, route distance, turns and repeated street distance.
+- "How these numbers are calculated": a formula trace for every headline number, tagged Data, Assumption or Rule.
 - Street-centerline distance plus a shortest-possible-route estimate, the basis used for certified courses.
 - Drawing a connected route through waypoints, including out-and-back legs on one street.
 - Importing a single GPX track or GeoJSON LineString, matched to street segments.
 - Editable global road-class assumptions, timing, full/rolling closure estimates, hourly rates and minimum shifts.
 - Individual junction overrides, planner notes and review filters.
-- Closure worksheets and observation worksheets (CSV), GeoJSON route downloads, JSON session export/import and browser-local persistence.
+- Closure worksheets and observation worksheets (CSV), a printable closure packet, share links, GeoJSON route downloads, JSON session export/import and browser-local persistence.
+- An access screen that checks car access with one-way streets and fire/EMS travel time.
 
 No third-party runtime libraries, map tiles or remote route services are required. The server only serves the static files in `dist/`.
 
@@ -27,9 +29,28 @@ Alley mouths that touch the course are counted per route and per site (`ALLEY_MO
 
 The initial officer counts `[1, 1, 2, 3]`, barricades per side approach `[1, 1, 2, 3]`, road weights `[1, 2, 4, 7]`, $85/hour rate and all timing values are illustrative assumptions. They are not published Richmond requirements.
 
-Burden points at a site = class weight × (1 + 0.2 × additional side approaches) plus the evidence factors below, with no fixed 100-point ceiling. The index is a relative weighting. Road weights run 1 to 7 while default officer counts run 1 to 3, so index differences overstate staffing differences. The interface therefore compares routes on peak officers and cost first and shows the index last.
+Burden points at a site = class weight × (1 + 0.2 × additional side approaches) plus the evidence factors below, with no fixed 100-point ceiling. The index is a relative weighting. Road weights run 1 to 7 while default officer counts run 1 to 3, so index differences overstate staffing differences. The interface therefore compares routes on officers and cost first and shows the index last. Road closures also prevent crashes with runners, so a lower index is not automatically safer.
 
-Full closures use one shared pre-start to last-finisher window. Rolling estimates use the earliest fastest-runner arrival and latest last-finisher passage at each site, including repeated route visits. Peak staffing is calculated from overlapping duty intervals. Cost applies the hourly rate and optional minimum paid shift per site. Redeployment, travel, supervision, relief, equipment costs and actual traffic flows are not modeled.
+Full closures use one shared pre-start to last-finisher window. Rolling estimates use the earliest fastest-runner arrival and latest last-finisher passage at each site, including repeated route visits.
+
+## Staffing and billing
+
+**Officers needed** is the sum of officers at each post; each post keeps its officers for its whole window. The app also reports the lower bound if officers could move between posts instantly (the most posts staffed at one moment). For 5K and 10K courses the two are equal: across all three start areas, no post closes before another opens, even with instant travel and a 15-minute setup. At 15K with a 15-minute setup the lower bound is 4–8% below. Officer redeployment is therefore not modeled. Supervision, relief and reserves are not modeled either.
+
+**Billing** follows Richmond PD's extra-duty agreements, verified on rva.gov on November 2, 2026:
+
+| Rule                                                                                                   | Source                                              |
+| ------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| 10 or more officers: special-event agreement; the City bills 1.5 × each officer's personal hourly rate | PD-119SPE (revised 06/09/2025), definitions ¶4, ¶12 |
+| Each officer bills at least 4 hours                                                                    | PD-119SPE ¶13; PD-119SE §19                         |
+| A started hour bills in full once it passes 15 minutes                                                 | PD-119SPE ¶18; PD-119SE §22                         |
+| Request due at least 30 calendar days ahead (10+ officers) or 7 working days (9 or fewer)              | PD-119SPE ¶5; PD-119SE §5                           |
+| RPD's Outside Employment Coordinator sets the number of officers                                       | PD-119SPE ¶11                                       |
+| 9 or fewer officers: PD-119SE lists $50/hour (+$6/hour for primary traffic control) as one rate option | PD-119SE (revised 07/14/2025)                       |
+
+Billed hours per officer = max(4, whole hours + 1 if the remainder exceeds 15 minutes). Cost = billed officer-hours × the billed rate. The $85 billed rate stays an illustrative placeholder, because personal hourly rates vary and no invoices are bundled. Because typical 5K/10K duty runs 1.2–2.4 hours, the 4-hour minimum sets billed hours for most posts; on the default Fan 5K the estimate rises from $11,921 in v3 to $20,400 (60 officers × 4 h × $85). The "Billing rule" setting can switch to modeled hours.
+
+Sessions saved before version 4 with the old minimum of 0 hours take the 4-hour minimum on load.
 
 ## Distance
 
@@ -115,7 +136,13 @@ The index is the sum of separately displayed hierarchy, side-approach, signal, t
 
 ## Access and disruption screen
 
-`dist/planning.js` compares undirected public-road connectivity before and after simultaneous closure of the course and nearby parallel same-name carriageway segments. It screens mapped facilities against the largest remaining study-area component and runs two illustrative cross-route distance probes. Its facility entrance snapping, grouping and closure footprint require review. It ignores one-way restrictions, turn restrictions, capacity, live traffic and external roads outside the bundled network. Connected does not mean approved, safe or operationally usable; separated can reflect a study-boundary or GIS error. Rolling closures are still screened under the all-course-closed scenario.
+`dist/planning.js` compares undirected public-road connectivity before and after simultaneous closure of the course and nearby parallel same-name carriageway segments. It screens mapped facilities against the largest remaining study-area component and runs two illustrative cross-route distance probes. Its facility entrance snapping, grouping and closure footprint require review.
+
+The directed check applies DPW one-way codes (FT: digitized direction only; TF: reverse only) and compares the largest strongly connected component before and after closure. It reports intersections that can be entered but not left by car, left but not entered, or cut off, and the streets most affected. On the default Fan 5K it finds 9 intersections that lose car access; 7 of them (5 can be entered but not left, 2 can be left but not entered) are invisible to the undirected check. It also flags Richmond Fire Station 10.
+
+Fire/EMS travel time runs a multi-source Dijkstra from all 14 mapped fire and EMS stations at posted speeds (25/30/35/40 mph by road class when unposted, 45 mph on freeway connections), before and after closure. Increases over 2 minutes are flagged. It assumes emergency vehicles follow one-way rules and do not cross the closed course, which is conservative: crossings can be agreed with RPD and Richmond Fire. Both checks run in under 100 ms.
+
+It ignores turn restrictions, capacity, live traffic and external roads outside the bundled network. Connected does not mean approved, safe or operationally usable; separated can reflect a study-boundary or GIS error. Rolling closures are still screened under the all-course-closed scenario.
 
 ## Actual-observation workflow
 
@@ -145,10 +172,10 @@ npm test                 # model, planning and regression suites
 npm run lint             # ESLint, recommended rules
 npm run format:check     # Prettier
 npm i -D playwright && npx playwright install chromium
-npm run test:ui          # 13 browser tests
+npm run test:ui          # 17 browser tests
 ```
 
-`tests/regression.test.cjs` and `tests/ui.test.cjs` guard each defect fixed in version 3. Run against the version-2 app, 12 of the 13 browser tests fail; all 13 pass on version 3. The one that passes on both checks for browser errors.
+`tests/regression.test.cjs` and `tests/ui.test.cjs` guard each defect fixed in version 3 and each feature added in version 4. All 17 browser tests pass on version 4.
 
 `.openai/hosting.json` is the configuration for the existing ChatGPT Sites deployment. Other hosts ignore it.
 
@@ -157,6 +184,19 @@ npm run test:ui          # 13 browser tests
 Use one past race and its real closure/staffing plan. Import its GPX, review detected junctions, replace default weights and staffing counts, assess route suitability, width, transit, construction, emergency and residential access, and compare predicted resources with the actual deployment. No staffing reduction is established by this prototype.
 
 Remaining production work includes operational staffing data, local validation, lane/width and turning-movement data, directional/capacity-aware access analysis, formally governed GIS refreshes, durable shared records, full immutable audit/version histories, and a constrained solver if the validated pilot warrants it. Type checking (for example JSDoc with `tsc --checkJs`) is not set up.
+
+## Version 4 changes
+
+The research roadmap was graded for fit with this app in [docs/roadmap-rubric.md](docs/roadmap-rubric.md). Items scoring 4.0 or higher out of 5 were built:
+
+| Item                                     | Score | What changed                                                                                                                                              |
+| ---------------------------------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Richmond PD billing rules and headcount  | 4.85  | 4-hour minimum, 15-minute rounding, PD-119SPE/PD-119SE threshold and lead time; "Officers needed" with the instant-move lower bound; billing-rule setting |
+| Explain this number, share links         | 4.55  | Formula trace per headline number tagged Data/Assumption/Rule; compressed share links (`#s=`) with a dataset check                                        |
+| Printable closure packet                 | 4.55  | Export → Closure packet: summary, route map with numbered posts, one row per post in course order, verified permit reminders                              |
+| Directed access and fire/EMS travel time | 4.40  | One-way traps and fire/EMS delays added to the access screen                                                                                              |
+
+Deferred, with the evidence in the rubric: permit deadline helper (3.90; Parks deadlines and the street fee could not be verified), calibration pipeline (3.80; no observations yet), Monte Carlo (3.65), GIS street widths (3.60) and elevation (3.30) (data not reachable from this build), ALNS search (3.55), officer redeployment (3.00; no effect at 5K/10K), MapLibre basemap (2.85) and the research bets.
 
 ## Version 3 changes
 

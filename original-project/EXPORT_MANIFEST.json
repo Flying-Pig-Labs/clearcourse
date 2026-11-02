@@ -1,0 +1,75 @@
+{
+  "project": "Richmond Race Lab",
+  "model_version": "2.0",
+  "source_commit": "8687a79cd5a38874eac86f0d5b36480d41941951",
+  "files": {
+    ".gitignore": {
+      "bytes": 79,
+      "sha256": "194cc01877d9c6740135bc8cbdf281a8c389dbcdeb91ea5e6d50fa6d299179aa"
+    },
+    ".openai/hosting.json": {
+      "bytes": 106,
+      "sha256": "2fe3627322b90058daa8c72d777d1f83052c7963a8c6cba3448f248d48f34146"
+    },
+    "README.md": {
+      "bytes": 9758,
+      "sha256": "75507aa8243b113b7be767ef959b1bc3e55394c13e14c4de427252e710824bda"
+    },
+    "dist/app.js": {
+      "bytes": 51759,
+      "sha256": "6752eb3bce2b1b18a71743cfdc815f0e173b8824ac5ac6dbd286fb356d736f3e"
+    },
+    "dist/data.js": {
+      "bytes": 4222647,
+      "sha256": "8eec0281f10af62316aad1b9b48da508ec905d0f04773fb3001e9e63bbd50a9d"
+    },
+    "dist/favicon.svg": {
+      "bytes": 337,
+      "sha256": "c0b4b64ec4e9a282a74ea31caddac59e70fae2c97278173a4e3f093c8ac82325"
+    },
+    "dist/index.html": {
+      "bytes": 21441,
+      "sha256": "b71f3bcc2ea1903580baa4f95c65681721b6eb5537b5c69d0c59dda17967d35e"
+    },
+    "dist/model.js": {
+      "bytes": 12457,
+      "sha256": "3f80857ae4ddadb81cfc32509bd2487cd2b12c343d63aaf238caa68e06ce9c79"
+    },
+    "dist/planning.js": {
+      "bytes": 8153,
+      "sha256": "23b34f24f467d8e50b84ef48438f41803e8778ad1d11caf2a4e5b61e6b3cc31d"
+    },
+    "dist/style.css": {
+      "bytes": 31277,
+      "sha256": "d39ab931ba909a582defd8483d68f0441edafd3bd6f8865c633575129ff08bfb"
+    },
+    "tests/model.test.cjs": {
+      "bytes": 3840,
+      "sha256": "434955b3824819f26c48e884669b9f67ee950576b7a5b07d4ccd4bc07db892de"
+    },
+    "tests/planning.test.cjs": {
+      "bytes": 4235,
+      "sha256": "b7e46b0786630da3635f10147a29182a1bb81cc7479ff9f201138628270d9652"
+    },
+    "tools/build_data.py": {
+      "bytes": 3315,
+      "sha256": "09b6cf54f19c506dafa5e5aa8ec8cb837b0dc7bfa57235b0ba9b0380b67e9c08"
+    },
+    "tools/enrich_data.py": {
+      "bytes": 6979,
+      "sha256": "aeb6d1785e00baadd3b944e3b2656fddde8af990a97ecc72ddbe445ce5cc78c6"
+    },
+    "tools/enrichment-raw.json": {
+      "bytes": 1092635,
+      "sha256": "780d7b923a095eb04ce0b029fad693aad7ebfb1b3c0a2c6b9343856775383722"
+    },
+    "tools/prepare_data.py": {
+      "bytes": 2123,
+      "sha256": "e1c84591ef662c2a7e162f2104374acf1919c3e3f26bc767b4b6a11f06aff987"
+    },
+    "tools/raw-streets.json": {
+      "bytes": 4052413,
+      "sha256": "27d7a65ab94e669492a2ffe57bfd57e154426b446aedc562159298025e8952cc"
+    }
+  }
+}

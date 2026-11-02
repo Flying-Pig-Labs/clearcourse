@@ -32,7 +32,7 @@
         ><button id="modelNav">Model & sources <span aria-hidden="true">↗</span></button>
       </nav>
       <div class="header-actions">
-        <span class="prototype"><span></span> Research update · v3</span>
+        <span class="prototype"><span></span> Research update · v4</span>
         <div class="export-wrap">
           <button class="button outline" id="exportButton">Export <span aria-hidden="true">↗</span></button>
           <div class="export-menu" id="exportMenu" hidden>
@@ -40,6 +40,8 @@
             ><button data-export="csv">Closure worksheet · CSV</button
             ><button data-export="worksheet">Observation worksheet · CSV</button
             ><button data-export="json">Full session · JSON</button
+            ><button data-export="share">Share link</button
+            ><button data-export="packet">Closure packet · print</button
             ><button data-export="print">Print planning brief</button>
           </div>
         </div>
@@ -222,6 +224,10 @@
             </div>
           </div>
           <div class="metrics" id="metrics" aria-live="polite"></div>
+          <details class="explain" id="explainPanel">
+            <summary>How these numbers are calculated</summary>
+            <div id="explainBody"></div>
+          </details>
         </div>
         <aside class="route-panel">
           <div class="panel-heading">
@@ -269,8 +275,8 @@
               <button class="button small outline" id="accessButton">Run screen →</button>
             </div>
             <p>
-              All course segments closed at once, including nearby parallel same-name carriageways. A topology
-              screen, not an emergency response plan.
+              All course segments closed at once, including nearby parallel same-name carriageways. Checks car
+              access with one-way streets and fire/EMS travel time. A screen, not an emergency response plan.
             </p>
             <div id="accessSummary"><div class="empty-analysis">Not run for this route.</div></div>
             <label class="map-toggle"
@@ -289,8 +295,8 @@
           <span class="timeline-legend"><i></i> Setup <i></i> Control <i></i> Clear</span>
         </div>
         <p class="analysis-help">
-          Modeled intervals for the six highest-burden locations. Peaks count overlapping assignments;
-          staffing reuse and travel are not modeled.
+          Modeled intervals for the six highest-burden locations. The curve counts officers on duty at the
+          same time; billing uses each officer's own window with the 4-hour minimum.
         </p>
         <div id="staffingTimeline"></div>
         <div id="staffingCurve"></div>
@@ -442,6 +448,11 @@
               <option value="full">Full route closure</option>
               <option value="rolling">Rolling closure estimate</option>
             </select></label
+          ><label
+            >Billing rule<select id="settingBilling">
+              <option value="rpd">Richmond PD agreement</option>
+              <option value="exact">Modeled hours only</option>
+            </select></label
           ><label>Race starts<input id="settingStart" type="time" /></label
           ><label
             >Fastest pace · min/km<input id="settingFast" type="number" min="2" max="30" step="0.5" /></label
@@ -455,9 +466,10 @@
           ><label>Start wave · minutes<input id="settingWave" type="number" min="0" max="240" /></label
           ><label>Setup lead · minutes<input id="settingSetup" type="number" min="0" max="240" /></label
           ><label>Clearance tail · minutes<input id="settingClear" type="number" min="0" max="240" /></label
-          ><label>Officer rate · $/hour<input id="settingRate" type="number" min="0" max="1000" /></label
           ><label
-            >Minimum paid shift · hours<input
+            >Billed rate · $/officer-hour<input id="settingRate" type="number" min="0" max="1000" /></label
+          ><label
+            >Minimum billed hours / officer<input
               id="settingMinimumShift"
               type="number"
               min="0"
@@ -493,10 +505,19 @@
             half the shorter adjacent segment. It is an estimate, not a certified measurement.
           </p>
           <p>
-            <strong>Officer-hours</strong> = sum of officers at each site × its modeled duty window.
-            <strong>Staffing cost</strong> applies the hourly rate and minimum shift to each site.
-            <strong>Peak officers</strong> is the maximum simultaneous modeled requirement, without
-            redeployment, travel, supervision or relief allowances.
+            <strong>Officers needed</strong> = sum of officers at each post; each post keeps its officers for
+            its whole window. The lower bound shown with it assumes officers could move between posts
+            instantly. For 5K and 10K courses the two are equal, because no post closes before another opens.
+            Supervision, relief and reserves are not modeled.
+          </p>
+          <p>
+            <strong>Billing (Richmond PD rule):</strong> each officer bills at least four hours, and a started
+            hour bills in full once it passes 15 minutes (forms PD-119SPE ¶13 and ¶18, PD-119SE §19 and §22).
+            Ten or more officers fall under the special-event agreement PD-119SPE: the City bills 1.5 × each
+            officer's personal hourly rate, the request is due at least 30 calendar days ahead, and RPD's
+            Outside Employment Coordinator sets the number of officers. Nine or fewer fall under PD-119SE, due
+            at least 7 working days ahead. The $85 billed rate is a placeholder until invoices calibrate it.
+            <strong>Billed officer-hours</strong> × rate = staffing cost.
           </p>
           <p>
             <strong>Full closure:</strong> all sites close before the start and reopen after the last finisher
@@ -573,11 +594,15 @@
             Data absence is not evidence of zero traffic or no signal.
           </p>
           <p>
-            <strong>Access screening:</strong> compares undirected public-road connectivity before and after
-            simultaneous closure of the selected segments and nearby parallel same-name carriageways. It
-            ignores one-way and turn restrictions, external roads outside the snapshot, capacity, live traffic
-            and actual emergency access arrangements. Detours are distance-only probes. A connected result is
-            not an access approval; a separated result may reflect study-boundary or GIS errors.
+            <strong>Access screening:</strong> compares public-road connectivity before and after simultaneous
+            closure of the selected segments and nearby parallel same-name carriageways. The undirected check
+            finds areas cut off entirely. The directed check applies DPW one-way codes and finds intersections
+            that can be entered but not left, or left but not entered. Fire/EMS travel time runs from every
+            mapped fire and EMS station at posted speeds (25–40 mph by road class when unposted), assuming
+            emergency vehicles follow one-way rules and do not cross the closed course; a change over 2
+            minutes is flagged. Turn restrictions, external roads outside the snapshot, capacity, live traffic
+            and agreed emergency crossings are not modeled. Detours are distance-only probes. A connected
+            result is not an access approval; a separated result may reflect study-boundary or GIS errors.
           </p>
           <p>
             <strong>Calibration:</strong> actual observations stay in this browser and session exports. Errors
@@ -637,6 +662,28 @@
         ><button class="button primary" id="saveSite">Save location <span aria-hidden="true">→</span></button>
       </div>
     </dialog>
+    <dialog id="shareDialog" class="site-dialog">
+      <div class="dialog-top">
+        <div>
+          <span class="eyebrow">SHARE</span>
+          <h2>Share this scenario</h2>
+        </div>
+        <button class="icon-close" data-close="shareDialog" aria-label="Close share">×</button>
+      </div>
+      <div class="dialog-content">
+        <p class="help-text">
+          The link carries the routes, brief, assumptions and location edits. Actual observations and the
+          review history stay in this browser.
+        </p>
+        <label class="note-label">Link<input id="shareLink" readonly /></label>
+        <div id="shareInfo" class="help-text"></div>
+      </div>
+      <div class="dialog-footer">
+        <button class="button outline" data-close="shareDialog">Close</button
+        ><button class="button primary" id="copyShare">Copy link</button>
+      </div>
+    </dialog>
+    <section id="packet" class="packet" aria-hidden="true"></section>
     <input type="file" id="actualsInput" accept=".csv,text/csv" hidden /><input
       type="file"
       id="fileInput"

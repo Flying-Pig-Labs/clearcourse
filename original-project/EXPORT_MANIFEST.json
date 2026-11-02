@@ -1,6 +1,6 @@
 {
   "project": "Richmond Race Lab",
-  "model_version": "3.0",
+  "model_version": "4.0",
   "dataset_version": "richmond-centerlines-2026-11-02-64e8dbb27033",
   "exported": "2026-11-02",
   "files": {
@@ -17,16 +17,16 @@
       "sha256": "5bb29b7a52c64de79e687e76e814f5647587d000211ef51954a12cacf1805fdc"
     },
     "README.md": {
-      "bytes": 18139,
-      "sha256": "99e04d3e9e4e8232c34eed695c7296bd1ca47795858ac3ab4f024f62d1910380"
+      "bytes": 23601,
+      "sha256": "ac408ad3afbbd197886801988d36bea62d4a976874339c01aec87365e217cca0"
     },
     "START_HERE.md": {
-      "bytes": 1624,
-      "sha256": "153425747d013c936a3a08a2e6dfad89bb1d3f073bcd7415d8bf2d00882b31db"
+      "bytes": 1763,
+      "sha256": "7119f60cebcfceff02b691bdd2de65534b933fea8ac8d07a2eebe25ff1ff03c6"
     },
     "dist/app.js": {
-      "bytes": 74074,
-      "sha256": "46811a68f1ad990fcc7a2fede9c6556f930dcc328b0d5873885707ae38e32293"
+      "bytes": 90066,
+      "sha256": "1f79f957d92eb671fe61be73cd312dadbae1e173ba77e7c9bdfa42b9fa9b77a7"
     },
     "dist/data.js": {
       "bytes": 4626101,
@@ -37,20 +37,24 @@
       "sha256": "c0b4b64ec4e9a282a74ea31caddac59e70fae2c97278173a4e3f093c8ac82325"
     },
     "dist/index.html": {
-      "bytes": 31056,
-      "sha256": "1c6539c597543c424c49a8d7c97e970c7e0bb991d422de7c6f7c065d5a2452cf"
+      "bytes": 33904,
+      "sha256": "1aab9bedd19101e6aab733bce73c44ae2dff5d444f2551448f7ac0aff2cf2c91"
     },
     "dist/model.js": {
-      "bytes": 39011,
-      "sha256": "5d21fbbfaaa79d00bd2ab51ad19287f5f304aecd068b7969b4df2f835c66fdbe"
+      "bytes": 40783,
+      "sha256": "549f2b56984eac34c0a4891ec280729d7410e4a28aca1a0522e6155742f98780"
     },
     "dist/planning.js": {
-      "bytes": 12468,
-      "sha256": "0869fc60214ff223046af3490760feba59a8f6f44230b5a7032d1c62b0c1d9da"
+      "bytes": 22033,
+      "sha256": "6e842203050ed1ef04d62f9b9c85b7cffef287d435f4633875e9ada85551bd29"
     },
     "dist/style.css": {
-      "bytes": 40709,
-      "sha256": "638d8b61c2ba6fbb244f5efc320c636e31f6846a2ce176cd8fd4049f38d6c5ca"
+      "bytes": 43353,
+      "sha256": "20ca5d84cb05bc153c45868b34e1f3a141091596b4df790dbe3912656e595619"
+    },
+    "docs/roadmap-rubric.md": {
+      "bytes": 7525,
+      "sha256": "1cef18256a4e429df9470957340afd71462a8b4448d10035d47b4b6e31960ada"
     },
     "eslint.config.mjs": {
       "bytes": 685,
@@ -62,7 +66,7 @@
     },
     "package.json": {
       "bytes": 977,
-      "sha256": "bc8ef16f953bd92346e09565de74a61b984a3befce5795309afb4954b47e834f"
+      "sha256": "ad21ce1c3040538a1f63cbca65abc3356d66cb149774a24bf49936d9e8c8089e"
     },
     "tests/model.test.cjs": {
       "bytes": 4523,
@@ -73,12 +77,12 @@
       "sha256": "d2678c1256ff8d5a42cb0ff70e234cbba4faaa46bcdaf29e71fc3820801ae65f"
     },
     "tests/regression.test.cjs": {
-      "bytes": 9909,
-      "sha256": "95de728d8838700853f85e925913e589ef5821bbfd1ad691d5f8976421fc0e0b"
+      "bytes": 13963,
+      "sha256": "4c540cf53c9f12c75d1caec14cf2a3544fa677b112dc663d07cb5a81717fb10c"
     },
     "tests/ui.test.cjs": {
-      "bytes": 13855,
-      "sha256": "40611e89ea16574c8ee3f4e2002cfe374dc64ee5051431985442e19d877c5754"
+      "bytes": 16892,
+      "sha256": "a7130aca3c22919f97a564e1e5fe627dc4ba438e17e7c26f295b9ca2ea665480"
     },
     "tools/build_data.py": {
       "bytes": 3315,

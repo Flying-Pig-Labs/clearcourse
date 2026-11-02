@@ -1,10 +1,10 @@
-# Richmond Race Lab v3 — complete project export
+# Richmond Race Lab v4 — complete project export
 
 ## Run locally
 
 Node.js or Python 3 is enough to serve the app; there is no build step.
 
-    cd Richmond_Race_Lab_v3
+    cd Richmond_Race_Lab_v4
     node tools/serve.cjs 8000
     # or: python3 -m http.server 8000 --directory dist
 
@@ -17,7 +17,7 @@ Open http://localhost:8000 in your browser. The bundled GIS snapshot is included
     npm run lint
     npm run format:check
     npm i -D playwright && npx playwright install chromium
-    npm run test:ui      # 13 browser tests
+    npm run test:ui      # 17 browser tests
 
 ## Contents
 
@@ -25,7 +25,8 @@ Open http://localhost:8000 in your browser. The bundled GIS snapshot is included
 - tests/: model, planning, regression and browser tests
 - tools/: GIS ingestion, graph preparation, enrichment and a static server
 - tools/raw-streets.json and tools/enrichment-raw.json: input snapshots
-- README.md: model, distance, import matching, data provenance, assumptions, version 3 changes and remaining validation work
+- README.md: model, staffing and billing rules, distance, import matching, access screening, data provenance, version 3 and 4 changes and remaining validation work
+- docs/roadmap-rubric.md: how each research recommendation was graded for fit, and which were built
 - .openai/hosting.json: the existing ChatGPT Sites configuration; other hosts ignore it
 - EXPORT_MANIFEST.json: SHA-256 hashes of exported project files
 

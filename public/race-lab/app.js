@@ -99,6 +99,10 @@
     if (r.fast < 2) r.fast = 2;
     if (r.slow < r.fast) r.slow = r.fast;
     if (['full', 'rolling'].includes(s.mode)) r.mode = s.mode;
+    // Sessions saved before model 4.0 have no billing rule; their minimumShift of 0 was the old default,
+    // so they take the Richmond PD rule and 4-hour minimum.
+    if (['rpd', 'exact'].includes(s.billing)) r.billing = s.billing;
+    else if (s.minimumShift === 0) r.minimumShift = M.DEFAULTS.minimumShift;
     if (/^([01]\d|2[0-3]):[0-5]\d$/.test(s.start || '')) r.start = s.start;
     return r;
   }
@@ -575,14 +579,26 @@
     $('optionCount').textContent = state.routes.length + ' routes';
     // Staffing and cost lead. The burden index is a relative weighting, so it comes last.
     $('metrics').innerHTML = [
-      ['Est. peak officers', n(sc.peak), '', 'Simultaneous modeled requirement'],
+      [
+        'Officers needed',
+        n(sc.officers),
+        '',
+        sc.peak < sc.officers
+          ? `Each post keeps its officers · at least ${n(sc.peak)} if officers could move instantly`
+          : `Each post keeps its officers · ${sc.agreement.form} applies`,
+      ],
       [
         'Est. staffing cost',
         money(sc.cost),
         '',
-        `${money(state.settings.rate)}/h · ${state.settings.mode === 'full' ? 'full closure' : 'rolling estimate'}`,
+        `${money(state.settings.rate)}/h · ${state.settings.billing === 'exact' ? 'modeled hours' : `${n(state.settings.minimumShift)}-hour minimum`} · ${state.settings.mode === 'full' ? 'full closure' : 'rolling closure'}`,
       ],
-      ['Officer-hours', n(sc.officerHours, 1), 'h', 'Modeled time across review sites'],
+      [
+        'Billed officer-hours',
+        n(sc.paidHours, 1),
+        'h',
+        `${n(sc.officerHours, 1)} h on duty across ${sc.sites.length} posts`,
+      ],
       [
         'Burden index',
         n(sc.index, 1),
@@ -595,20 +611,21 @@
           `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}<span class="metric-unit">${unit}</span></div><div class="metric-foot">${foot}</div></div>`
       )
       .join('');
+    $('explainBody').innerHTML = explainHTML(r, sc);
     $('routeCards').innerHTML = state.routes
       .map((rt) => {
         const s = score(rt),
           isSelected = rt.id === r.id,
           comparable = rt.id !== base.id && Math.abs(rt.length - base.length) / base.length <= 0.1,
           tag = comparable ? resourceDelta(s, baseScore) : '';
-        return `<div class="route-card-wrap"><button class="route-card ${isSelected ? 'selected' : ''}" data-route="${escape(rt.id)}" aria-pressed="${isSelected}"><div class="route-card-top"><h3>${escape(rt.name)}</h3><span class="radio" aria-hidden="true"></span></div><div class="route-card-sub">${n(rt.length / 1000, 2)} km · ${s.turns} turns · ${n(s.index)} burden pts${hasData(rt) ? ' · has edits or observations' : ''}${P.constraints(net, rt, { ...brief(), overrides: state.overrides[rt.id] || {} }).length ? ' · outside brief' : ''}${tag ? `<span class="route-card-tag">${tag}</span>` : ''}</div><div class="route-card-metrics"><span>${n(s.peak)}<small>peak officers</small></span><span>${money(s.cost)}<small>est. cost</small></span><span>${s.sites.length}<small>review sites</small></span></div></button>${state.routes.length > 1 ? `<button class="route-remove" data-remove="${escape(rt.id)}" aria-label="Remove ${escape(rt.name)}" title="Remove this route">×</button>` : ''}</div>`;
+        return `<div class="route-card-wrap"><button class="route-card ${isSelected ? 'selected' : ''}" data-route="${escape(rt.id)}" aria-pressed="${isSelected}"><div class="route-card-top"><h3>${escape(rt.name)}</h3><span class="radio" aria-hidden="true"></span></div><div class="route-card-sub">${n(rt.length / 1000, 2)} km · ${s.turns} turns · ${n(s.index)} burden pts${hasData(rt) ? ' · has edits or observations' : ''}${P.constraints(net, rt, { ...brief(), overrides: state.overrides[rt.id] || {} }).length ? ' · outside brief' : ''}${tag ? `<span class="route-card-tag">${tag}</span>` : ''}</div><div class="route-card-metrics"><span>${n(s.officers)}<small>officers</small></span><span>${money(s.cost)}<small>est. cost</small></span><span>${s.sites.length}<small>review sites</small></span></div></button>${state.routes.length > 1 ? `<button class="route-remove" data-remove="${escape(rt.id)}" aria-label="Remove ${escape(rt.name)}" title="Remove this route">×</button>` : ''}</div>`;
       })
       .join('');
     const pct = (a, b) => (b ? Math.round(((a - b) / b) * 100) : 0);
     $('routeNote').innerHTML =
       (r.id === base.id
         ? `<strong>${sc.sites.length} locations to review.</strong> ${sc.major} involve an arterial under the model.${sc.freewayConnections ? ` ${sc.freewayConnections} touch a freeway ramp or interchange.` : ''} ${delta / target > state.constraints.tolerance ? `This candidate is ${n(delta, 2)} km from the target; revise its geometry before comparing equal-distance routes.` : ''}`
-        : `<strong>${signed(sc.peak - baseScore.peak)} peak officers (${signed(pct(sc.peak, baseScore.peak))}%) and ${signedMoney(sc.cost - baseScore.cost)} (${signed(pct(sc.cost, baseScore.cost))}%)</strong> versus ${escape(base.name.toLowerCase())}. Burden index ${signed(pct(sc.index, baseScore.index))}%. Length differs by ${n(Math.abs(r.length - base.length) / 1000, 2)} km. ${Math.abs(r.length - base.length) / base.length > 0.1 ? 'Different distances: compare totals with care. ' : ''}${sc.major} arterial review sites.`) +
+        : `<strong>${signed(sc.officers - baseScore.officers)} officers (${signed(pct(sc.officers, baseScore.officers))}%) and ${signedMoney(sc.cost - baseScore.cost)} (${signed(pct(sc.cost, baseScore.cost))}%)</strong> versus ${escape(base.name.toLowerCase())}. Burden index ${signed(pct(sc.index, baseScore.index))}%. Length differs by ${n(Math.abs(r.length - base.length) / 1000, 2)} km. ${Math.abs(r.length - base.length) / base.length > 0.1 ? 'Different distances: compare totals with care. ' : ''}${sc.major} arterial review sites.`) +
       `<br>${state.settings.mode === 'rolling' ? 'Rolling closure estimate' : 'Full-route closure assumption'} · ${n(sc.barricades)} modeled barricades${sc.alleyMouths ? ` · ${sc.alleyMouths} alley mouths touch the course` : ''}.<br><span class="measure-note">Certified courses are measured on the shortest possible route. This estimate is ${n(sc.shortestRoute / 1000, 2)} km, ${n(sc.cornerCut)} m less than the centerline. Have a certified measurer confirm the distance.</span>`;
     $('driversList').innerHTML =
       sc.sites
@@ -626,6 +643,82 @@
     renderPlanning(sc);
     persist();
   }
+  // Formula traces for each headline number, tagged as data, assumption or rule.
+  function explainHTML(r, sc) {
+    const p = state.settings,
+      edited = Object.keys(state.overrides[r.id] || {}).length,
+      tag = (kind) => `<span class="explain-tag ${kind.toLowerCase()}">${kind}</span>`;
+    const byClass = M.CLASSES.map((label, c) => {
+      const posts = sc.sites.filter((s) => s.c === c);
+      return posts.length
+        ? `${posts.length} ${label.toLowerCase()} post${posts.length === 1 ? '' : 's'} → ${posts.reduce((a, s) => a + s.officers, 0)}`
+        : '';
+    }).filter(Boolean);
+    const billed = new Map();
+    for (const s of sc.sites)
+      billed.set(s.billedHoursEach, (billed.get(s.billedHoursEach) || 0) + s.officers);
+    const duty = sc.sites.map((s) => s.hours);
+    const rows = [
+      [
+        'Officers needed',
+        `${n(sc.officers)} = ${byClass.join(' + ')}. Defaults per post: ${p.officers.join(' / ')} by road class${Number(p.signalOfficers) ? `, +${p.signalOfficers} at matched signals` : ''}${edited ? `; ${edited} post${edited === 1 ? '' : 's'} edited by planners` : ''}.${sc.peak < sc.officers ? ` If officers could move between posts instantly, ${n(sc.peak)} would still be on duty at the busiest moment.` : ' No post closes before another opens, so moving officers between posts would not reduce this.'}`,
+        'Assumption',
+        "RPD's Outside Employment Coordinator sets the real number (PD-119SPE ¶11).",
+      ],
+      [
+        'Duty window',
+        p.mode === 'full'
+          ? `Setup ${n(p.setup)} min + last finisher ${n(sc.length / 1000, 2)} km × ${n(p.slow, 1)} min/km + start wave ${n(p.wave)} min + clearance ${n(p.clear)} min = ${n(duty[0] || 0, 2)} h at every post.`
+          : `Each post opens ${n(p.setup)} min before the lead runner (${n(p.fast, 1)} min/km) and reopens after the last runner (${n(p.slow, 1)} min/km) + ${n(p.wave)} min wave + ${n(p.clear)} min clearance: ${n(Math.min(...duty), 2)}–${n(Math.max(...duty), 2)} h.`,
+        'Assumption',
+        'Paces, setup and clearance are editable in the model.',
+      ],
+      [
+        'Billed officer-hours',
+        `${[...billed.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .map(([h, o]) => `${n(o)} officers × ${n(h, 2)} h`)
+          .join(' + ')} = ${n(sc.paidHours, 1)} h.`,
+        p.billing === 'exact' ? 'Assumption' : 'Rule',
+        p.billing === 'exact'
+          ? `Modeled hours with a ${n(p.minimumShift)}-hour minimum.`
+          : `Each officer bills at least ${n(p.minimumShift)} hours; a started hour bills in full past 15 minutes (PD-119SPE ¶13, ¶18).`,
+      ],
+      [
+        'Staffing cost',
+        `${n(sc.paidHours, 1)} billed h × ${money(p.rate)} = ${money(sc.cost)}.`,
+        'Assumption',
+        'PD-119SPE bills 1.5 × each officer’s personal hourly rate; the rate is a placeholder until invoices calibrate it.',
+      ],
+      [
+        'RPD agreement',
+        `${n(sc.officers)} officers → ${sc.agreement.form} (revised ${sc.agreement.revised}). Submit the request at least ${sc.agreement.lead} before race day.`,
+        'Rule',
+        sc.officers >= M.RPD.specialEventOfficers
+          ? 'PD-119SPE covers events needing 10 or more officers.'
+          : 'PD-119SE covers events needing 9 or fewer officers; it lists $50/hour plus $6/hour for primary traffic control as one rate option.',
+      ],
+      [
+        'Distance',
+        `${n(sc.length / 1000, 2)} km centerline − ${n(sc.cornerCut)} m corner cutting at ${sc.turns} turns over 45° and smaller bends ≈ ${n(sc.shortestRoute / 1000, 2)} km on the shortest possible route.`,
+        'Assumption',
+        `Per turn: 2 × (${n(p.curbOffset, 1)} m centerline-to-curb − 0.30 m) × tan(angle ÷ 2). Only a certified measurement settles the distance.`,
+      ],
+      [
+        'Burden index',
+        `${n(sc.index, 1)} points of relative weighting from road class, approaches, matched signals, 2025 ADT and posted speed.`,
+        'Assumption',
+        'Road closures also prevent crashes with runners, so a lower index is not automatically safer.',
+      ],
+      [
+        'Data',
+        `Streets and road classes: Richmond DPW centerlines. Signals and facilities: Richmond GIS. Volumes: VDOT 2025 AADT, spatially matched. Snapshot ${DATASET}.`,
+        'Data',
+        'Retrieved November 2, 2026. Matches are not field-verified.',
+      ],
+    ];
+    return `<dl class="explain-list">${rows.map(([term, formula, kind, note]) => `<div><dt>${escape(term)} ${tag(kind)}</dt><dd>${escape(formula)}<small>${escape(note)}</small></dd></div>`).join('')}</dl>`;
+  }
   function signed(v) {
     return (v > 0 ? '+' : v < 0 ? '−' : '±') + n(Math.abs(v));
   }
@@ -635,10 +728,10 @@
   // Compare resources, not the index: the index weights roads 1 to 7 while officer counts run 1 to 3,
   // so index differences overstate staffing differences.
   function resourceDelta(s, base) {
-    const officers = base.peak ? Math.round(((s.peak - base.peak) / base.peak) * 100) : 0,
+    const officers = base.officers ? Math.round(((s.officers - base.officers) / base.officers) * 100) : 0,
       cost = base.cost ? Math.round(((s.cost - base.cost) / base.cost) * 100) : 0;
     if (!officers && !cost) return '';
-    return `${officers > 0 ? '+' : officers < 0 ? '−' : '±'}${Math.abs(officers)}% peak officers · ${cost > 0 ? '+' : cost < 0 ? '−' : '±'}${Math.abs(cost)}% cost`;
+    return `${officers > 0 ? '+' : officers < 0 ? '−' : '±'}${Math.abs(officers)}% officers · ${cost > 0 ? '+' : cost < 0 ? '−' : '±'}${Math.abs(cost)}% cost`;
   }
   function distanceLabel(sc) {
     return `${n(sc.length / 1000, 2)} km centerline · ≈${n(sc.shortestRoute / 1000, 2)} km shortest route`;
@@ -784,6 +877,7 @@
     ).join('');
     for (const k of [
       'Mode',
+      'Billing',
       'Start',
       'Fast',
       'Slow',
@@ -839,6 +933,7 @@
       p[k[0].toLowerCase() + k.slice(1)] = v;
     }
     p.mode = $('settingMode').value;
+    p.billing = $('settingBilling').value === 'exact' ? 'exact' : 'rpd';
     p.start = $('settingStart').value;
     if (!valid || p.fast > p.slow || !p.start) {
       $('modelError').textContent =
@@ -1099,6 +1194,14 @@
       window.print();
       return;
     }
+    if (type === 'share') {
+      openShare();
+      return;
+    }
+    if (type === 'packet') {
+      printPacket(r, sc);
+      return;
+    }
     if (type === 'json') {
       download(
         'richmond-race-lab-session-' + date + '.json',
@@ -1160,6 +1263,7 @@
         'freeway_connection',
         'alley_mouths',
         'officers_assumed',
+        'billed_hours_each',
         'barricades_assumed',
         'duty_start',
         'duty_end',
@@ -1183,6 +1287,7 @@
           s.limitedAccess ? 'Yes' : 'No',
           s.alleys,
           s.officers,
+          s.billedHoursEach,
           s.barriers,
           time(s.startTime),
           time(s.endTime),
@@ -1305,7 +1410,17 @@
       return;
     }
     $('accessSummary').innerHTML =
-      `<div class="access-tiles"><div class="access-tile"><strong>${result.screened}</strong>facilities screened</div><div class="access-tile ${result.warnings.length ? 'warn' : ''}"><strong>${result.warnings.length}</strong>facility warnings</div><div class="access-tile"><strong>${result.unknown}</strong>not assessed</div></div><div class="access-message">${result.isolatedNodes} mapped road nodes separated from the largest remaining study-area component. ${result.closedEdges} selected or paired carriageway segments removed.</div>${result.warnings.length ? `<ul class="access-list">${result.warnings.map((f) => `<li class="access-warning">${escape(f.name)} — ${f.status === 'closed-node' ? 'snapped to a fully closed road node' : 'separated from the main study-area component'}</li>`).join('')}</ul>` : '<p class="access-message">No facility separation detected under this limited topology model. This is not confirmation of usable emergency access.</p>'}<ul class="access-list">${result.probes.map((p) => `<li><b>${p.name}</b> · ${p.before === null ? 'baseline not assessed' : p.after === null ? 'no remaining path in the study graph' : `${n(p.before / 1000, 2)} → ${n(p.after / 1000, 2)} km (+${n(p.added / 1000, 2)} km)`}</li>`).join('')}</ul><details><summary>Facility review list</summary><ul class="access-list">${result.facilities.map((f) => `<li>${escape(f.name)} · ${escape(f.kind)} · ${f.status === 'connected' ? 'connected in undirected graph' : f.status === 'not-assessed' ? 'not assessed' : f.status}</li>`).join('')}</ul></details><p class="access-message">One-way restrictions, turn rules, off-network roads, capacity and live conditions are not modeled. The facility entrance snap and GIS classification require review.</p>`;
+      `<div class="access-tiles"><div class="access-tile"><strong>${result.screened}</strong>facilities screened</div><div class="access-tile ${result.warnings.length ? 'warn' : ''}"><strong>${result.warnings.length}</strong>facility warnings</div><div class="access-tile"><strong>${result.unknown}</strong>not assessed</div></div><div class="access-message">${result.isolatedNodes} mapped road nodes separated from the largest remaining study-area component. ${result.closedEdges} selected or paired carriageway segments removed.</div>${result.warnings.length ? `<ul class="access-list">${result.warnings.map((f) => `<li class="access-warning">${escape(f.name)} — ${f.status === 'closed-node' ? 'snapped to a fully closed road node' : 'separated from the main study-area component'}</li>`).join('')}</ul>` : '<p class="access-message">No facility separation detected under this limited topology model. This is not confirmation of usable emergency access.</p>'}<ul class="access-list">${result.probes.map((p) => `<li><b>${p.name}</b> · ${p.before === null ? 'baseline not assessed' : p.after === null ? 'no remaining path in the study graph' : `${n(p.before / 1000, 2)} → ${n(p.after / 1000, 2)} km (+${n(p.added / 1000, 2)} km)`}</li>`).join('')}</ul><details><summary>Facility review list</summary><ul class="access-list">${result.facilities.map((f) => `<li>${escape(f.name)} · ${escape(f.kind)} · ${f.status === 'connected' ? 'connected in undirected graph' : f.status === 'not-assessed' ? 'not assessed' : f.status}</li>`).join('')}</ul></details>${directedHTML(result)}<p class="access-message">Turn rules, off-network roads, capacity and live conditions are not modeled. The facility entrance snap and GIS classification require review.</p>`;
+  }
+  // One-way access and fire/EMS travel time after the course closes.
+  function directedHTML(result) {
+    const d = result.directed,
+      t = result.response;
+    if (!d || !t) return '';
+    const list = (streets) =>
+      streets.length ? streets.map((x) => `${escape(x.name)} (${x.count})`).join(', ') : 'none';
+    const oneWay = d.trapped + d.noEntry + d.cutOff;
+    return `<h4 class="access-subhead">With one-way streets</h4><div class="access-tiles"><div class="access-tile ${oneWay ? 'warn' : ''}"><strong>${n(oneWay)}</strong>intersections lose car access</div><div class="access-tile ${t.slower + t.unreachable ? 'warn' : ''}"><strong>${n(t.slower + t.unreachable)}</strong>fire/EMS over 2 min slower or cut off</div><div class="access-tile"><strong>+${n(t.worst / 60, 1)}</strong>min worst fire/EMS delay</div></div><p class="access-message">${n(d.trapped)} intersections can be entered but not left by car, ${n(d.noEntry)} can be left but not entered, and ${n(d.cutOff)} are cut off. Most affected: ${list(d.streets)}.</p><p class="access-message">From ${t.stations} fire and EMS stations, travel time rises more than 2 minutes at ${n(t.slower)} intersections and ${n(t.unreachable)} become unreachable${t.worst ? `; the largest increase is +${n(t.worst / 60, 1)} min near ${escape(t.worstStreets.join(' / '))}` : ''}. Most affected: ${list(t.streets)}. This assumes emergency vehicles follow one-way rules and do not cross the closed course; agree crossing points with RPD and Richmond Fire.</p>${d.facilities.length ? `<ul class="access-list">${d.facilities.map((f) => `<li class="access-warning">${escape(f.name)} — ${f.canLeave === false && f.canReach === false ? 'cut off' : f.canLeave === false ? 'vehicles cannot leave' : 'vehicles cannot reach it'} once the course closes</li>`).join('')}</ul>` : ''}`;
   }
   async function runAccess() {
     if (!active()) return;
@@ -1418,7 +1533,7 @@
     }
     path += ' L600 56';
     $('staffingCurve').innerHTML =
-      `<div><strong>${sc.peak} estimated peak</strong><br>${n(sc.officerHours, 1)} officer-hours<br>${n(sc.paidHours, 1)} paid officer-hours</div><svg viewBox="0 0 600 62" preserveAspectRatio="none" role="img" aria-label="Modeled simultaneous officer assignments over time, peak ${sc.peak}"><path d="${path} L0 56Z" fill="#edf3e4"/><path d="${path}" fill="none" stroke="#789b64" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg></div>`;
+      `<div><strong>${sc.peak} on duty at once</strong><br>${n(sc.officerHours, 1)} officer-hours on duty<br>${n(sc.paidHours, 1)} billed officer-hours</div><svg viewBox="0 0 600 62" preserveAspectRatio="none" role="img" aria-label="Modeled simultaneous officer assignments over time, at most ${sc.peak}"><path d="${path} L0 56Z" fill="#edf3e4"/><path d="${path}" fill="none" stroke="#789b64" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg></div>`;
   }
   function renderCalibration(sc) {
     const records = state.calibration[active().id] || [],
@@ -1484,6 +1599,135 @@
       toast(e.message);
     } finally {
       $('actualsInput').value = '';
+    }
+  }
+  // Printable closure packet: summary, route map with numbered posts, and one row per post in course order.
+  function packetMap(r, posts) {
+    const pts = r.nodes.map((i) => D.nodes[i]),
+      xs = pts.map((p) => p[0]),
+      ys = pts.map((p) => p[1]),
+      pad = 150,
+      minx = Math.min(...xs) - pad,
+      maxx = Math.max(...xs) + pad,
+      miny = Math.min(...ys) - pad,
+      maxy = Math.max(...ys) + pad,
+      unit = Math.max(maxx - minx, maxy - miny) / 600;
+    const inside = (p) => p[0] >= minx && p[0] <= maxx && p[1] >= miny && p[1] <= maxy;
+    const streets = D.edges
+      .filter((e) => e.c >= 0 && e.p.some(inside))
+      .map((e) => pathString(e.p))
+      .join('');
+    const marks = posts
+      .map(
+        (s, i) =>
+          `<circle cx="${s.x}" cy="${s.y}" r="${7 * unit}" fill="#fff" stroke="#173e30" stroke-width="${1.2 * unit}"/><text x="${s.x}" y="${s.y + 2.6 * unit}" font-size="${7 * unit}" text-anchor="middle" font-family="system-ui" font-weight="700" fill="#173e30">${i + 1}</text>`
+      )
+      .join('');
+    const start = D.nodes[r.nodes[0]];
+    return `<svg class="packet-map" viewBox="${minx} ${miny} ${maxx - minx} ${maxy - miny}" role="img" aria-label="Route map with numbered posts"><path d="${streets}" fill="none" stroke="#c9cfc2" stroke-width="${1.2 * unit}"/><path d="${routeGeometry(r)}" fill="none" stroke="#2f6b47" stroke-width="${4 * unit}" stroke-linejoin="round" stroke-linecap="round"/>${marks}<rect x="${start[0] - 7 * unit}" y="${start[1] - 7 * unit}" width="${14 * unit}" height="${14 * unit}" fill="#173e30"/><text x="${start[0]}" y="${start[1] + 2.6 * unit}" font-size="${7 * unit}" text-anchor="middle" font-family="system-ui" font-weight="700" fill="#fff">S</text></svg>`;
+  }
+  function printPacket(r, sc) {
+    const p = state.settings,
+      posts = sc.sites.slice().sort((a, b) => Math.min(...a.km) - Math.min(...b.km) || a.id - b.id),
+      access = accessResult(),
+      date = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+    const accessLine = access
+      ? `${access.warnings.length} facility warning${access.warnings.length === 1 ? '' : 's'}; ${n(access.directed.trapped)} intersections can be entered but not left by car; fire/EMS travel time rises more than 2 minutes at ${n(access.response.slower)} intersections (worst +${n(access.response.worst / 60, 1)} min).`
+      : 'Not run for this route. Run the access screen before printing for review.';
+    const summary = [
+      [
+        'Distance',
+        `${n(sc.length / 1000, 2)} km centerline · ≈${n(sc.shortestRoute / 1000, 2)} km shortest route (estimate; certify before publishing)`,
+      ],
+      [
+        'Closure',
+        `${p.mode === 'full' ? 'Full route closure' : 'Rolling closure'} · race starts ${time(Number(p.start.split(':')[0]) * 60 + Number(p.start.split(':')[1]))}`,
+      ],
+      [
+        'Officers',
+        `${n(sc.officers)} at ${sc.sites.length} posts · ${sc.agreement.form}: request at least ${sc.agreement.lead} ahead`,
+      ],
+      [
+        'Billed hours and cost',
+        `${n(sc.paidHours, 1)} billed officer-hours × ${money(p.rate)} = ${money(sc.cost)} (illustrative rate)`,
+      ],
+      [
+        'Barricades',
+        `${n(sc.barricades)} modeled${sc.alleyMouths ? ` · ${sc.alleyMouths} alley mouths touch the course` : ''}${sc.freewayConnections ? ` · ${sc.freewayConnections} posts at freeway ramps or interchanges` : ''}`,
+      ],
+      ['Access screen', accessLine],
+    ];
+    const rows = posts
+      .map((s, i) => {
+        const [lon, lat] = M.lonlat(s.x, s.y);
+        return `<tr><td>${i + 1}</td><td>${escape(s.names.slice(0, 3).join(' / '))}${s.limitedAccess ? '<br><small>Freeway connection</small>' : ''}</td><td>${escape(M.CLASSES[s.c])}</td><td>${s.approaches}${s.alleys ? ` + ${s.alleys} alley` : ''}</td><td>${s.officers}</td><td>${s.barriers}</td><td>${time(s.startTime)} – ${time(s.endTime)}</td><td>${n(Math.min(...s.km), 2)}</td><td>${lat.toFixed(5)}, ${lon.toFixed(5)}</td><td>${escape(s.note)}</td></tr>`;
+      })
+      .join('');
+    $('packet').innerHTML =
+      `<header><h1>Closure packet · ${escape(r.name)}</h1><p>Generated ${escape(date)} · model ${M.VERSION} · rules r${state.ruleRevision} · ${escape(DATASET)} · route ${escape(r.id)}</p><p class="packet-warning">Planning estimate, not an approved traffic-control plan. RPD's Outside Employment Coordinator sets the number of officers (PD-119SPE ¶11).</p></header><dl class="packet-summary">${summary.map(([k, v]) => `<div><dt>${escape(k)}</dt><dd>${escape(v)}</dd></div>`).join('')}</dl>${packetMap(r, posts)}<table class="packet-table"><thead><tr><th>#</th><th>Post</th><th>Road class</th><th>Approaches</th><th>Officers</th><th>Barricades</th><th>On duty</th><th>km</th><th>Lat, lon</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table><footer><p>Set barricades and signs following MUTCD Part 6 temporary traffic control. Post "No Parking" signs at least 48 hours ahead and file the street closing permit at least 15 business days ahead (Richmond street closing permit guide; City Code §90-361). Verify each post on site before race day.</p></footer>`;
+    document.body.classList.add('printing-packet');
+    recordAudit('Printed closure packet for ' + r.name);
+    window.print();
+  }
+  // Scenario for a share link: routes as start node + edge IDs, plus brief, assumptions and edits.
+  function shareSession() {
+    return {
+      v: 2,
+      d: DATASET,
+      distance: state.distance,
+      seed: state.seed,
+      preference: state.preference,
+      pickedStart: state.pickedStart,
+      settings: state.settings,
+      constraints: state.constraints,
+      ruleRevision: state.ruleRevision,
+      selected: state.routes.findIndex((r) => r.id === state.selected),
+      routes: state.routes.map((r) => ({
+        role: r.role,
+        name: r.name,
+        kind: r.kind,
+        s: r.nodes[0],
+        e: r.edges,
+      })),
+      overrides: state.routes.map((r) => state.overrides[r.id] || {}),
+    };
+  }
+  function sessionFromShare(x) {
+    if (!x || x.v !== 2 || !Array.isArray(x.routes)) throw new Error('This link is not a Race Lab scenario.');
+    if (x.d !== DATASET)
+      throw new Error(
+        `It was made with street snapshot ${String(x.d).slice(0, 60)}; this app uses ${DATASET}.`
+      );
+    const routes = x.routes.slice(0, MAX_ROUTES).map((r, i) => ({
+      ...P.routeFromEdges(D, r.s, r.e),
+      id: 'i' + i,
+      role: r.role,
+      name: r.name,
+      kind: r.kind,
+    }));
+    return {
+      ...x,
+      version: 2,
+      datasetVersion: x.d,
+      routes,
+      selected: 'i' + Math.max(0, Number(x.selected) || 0),
+      overrides: Object.fromEntries(routes.map((r, i) => [r.id, (x.overrides || [])[i] || {}])),
+      calibration: {},
+      audit: [],
+    };
+  }
+  async function openShare() {
+    try {
+      const token = await P.packShare(shareSession()),
+        link = location.origin + location.pathname + '#s=' + token;
+      $('shareLink').value = link;
+      $('shareInfo').textContent =
+        `${n(link.length)} characters · ${state.routes.length} route${state.routes.length === 1 ? '' : 's'} · model ${M.VERSION} · ${DATASET}`;
+      $('shareDialog').showModal();
+      $('shareLink').select();
+      recordAudit('Created a share link');
+    } catch (e) {
+      toast('The share link could not be created: ' + e.message);
     }
   }
   function exportWorksheet() {
@@ -1568,6 +1812,15 @@
       'Worksheet downloaded. Fill the actual columns, preserve the site IDs, then import it for comparison.'
     );
   }
+  $('copyShare').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText($('shareLink').value);
+      toast('Share link copied.');
+    } catch {
+      $('shareLink').select();
+      toast('Copy the selected link with Ctrl+C or Cmd+C.');
+    }
+  });
   $('applyBrief').addEventListener('click', generateRoutes);
   $('accessButton').addEventListener('click', runAccess);
   $('showFacilities').addEventListener('change', renderMapOverlays);
@@ -1817,6 +2070,7 @@
       applyView();
     }
   });
+  window.addEventListener('afterprint', () => document.body.classList.remove('printing-packet'));
   let resizeTimer;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
@@ -1832,6 +2086,19 @@
   syncControls();
   applyView();
   (async () => {
+    // A share link (#s=...) replaces the browser session; the fragment is then removed so a reload keeps edits.
+    if (location.hash.startsWith('#s=')) {
+      try {
+        state = validateSession(sessionFromShare(await P.unpackShare(location.hash.slice(3))));
+        syncControls();
+        recordAudit('Opened a shared scenario');
+        startupNotice =
+          'Shared scenario loaded. Actual observations and review history stay in the browser that made the link.';
+      } catch (e) {
+        startupNotice = 'Shared link not loaded. ' + e.message;
+      }
+      history.replaceState(null, '', location.pathname + location.search);
+    }
     if (state.routes.length) {
       $('mapLoading').hidden = true;
       render();

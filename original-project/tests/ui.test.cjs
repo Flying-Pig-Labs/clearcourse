@@ -53,7 +53,7 @@ async function step(name, fn) {
     assert.equal(s.state.routes[0].name, 'Balanced loop');
     assert.match(s.state.datasetVersion, /^richmond-centerlines-/);
     const metrics = await page.locator('#metrics .metric-label').allTextContents();
-    assert.deepEqual(metrics.slice(0, 2), ['Est. peak officers', 'Est. staffing cost']);
+    assert.deepEqual(metrics.slice(0, 2), ['Officers needed', 'Est. staffing cost']);
   });
 
   await step('closure worksheet menu item exports the closure worksheet', async () => {
@@ -307,6 +307,67 @@ async function step(name, fn) {
     assert.equal(s.state.routes[0].id, legacy.expected);
     assert.equal(s.state.routes[0].role, 'proposed');
     assert.equal(s.state.overrides[legacy.expected][legacy.site].officers, 9);
+  });
+
+  await step('cost follows the Richmond PD 4-hour minimum and the explain panel shows it', async () => {
+    await page.click('[data-distance="5"]');
+    await idle();
+    const s = await snapshot();
+    const billed = s.selectedScore.sites.reduce((a, x) => a + x.officers * Math.max(4, x.billedHoursEach), 0);
+    assert.equal(s.selectedScore.paidHours, billed);
+    assert.ok(s.selectedScore.sites.every((x) => x.billedHoursEach >= 4));
+    await page.click('#explainPanel summary');
+    const text = await page.locator('#explainBody').innerText();
+    for (const phrase of ['PD-119SPE', 'at least 4 hours', 'Officers needed', 'Distance'])
+      assert.ok(text.includes(phrase), phrase);
+  });
+
+  await step('share links open the same scenario in a new browser', async () => {
+    const s = await snapshot();
+    await page.click('#exportButton');
+    await page.click('[data-export="share"]');
+    await page.waitForFunction(() => document.getElementById('shareLink').value.includes('#s='));
+    const link = await page.inputValue('#shareLink');
+    assert.match(link, /#s=z/);
+    await page.click('#shareDialog [data-close]');
+    const other = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const p = await other.newPage();
+    await p.goto(link);
+    await p.waitForFunction(() => window.RaceLab && RaceLab.ready);
+    const t = await p.evaluate(() => RaceLab.getSnapshot());
+    assert.deepEqual(
+      t.state.routes.map((r) => r.id),
+      s.state.routes.map((r) => r.id)
+    );
+    assert.equal(t.state.selected, s.state.selected);
+    assert.equal(await p.evaluate(() => location.hash), '', 'The fragment is cleared after loading');
+    assert.match(
+      await p.evaluate(() => document.getElementById('toast').textContent),
+      /Shared scenario loaded/
+    );
+    await other.close();
+  });
+
+  await step('access screen reports one-way access and fire/EMS travel time', async () => {
+    await page.click('#accessButton');
+    await page.waitForFunction(() => document.getElementById('accessButton').textContent.includes('Run'));
+    const text = await page.locator('#accessSummary').innerText();
+    assert.ok(text.includes('With one-way streets'));
+    assert.match(text, /From \d+ fire and EMS stations/);
+  });
+
+  await step('closure packet lists every post in course order', async () => {
+    await page.evaluate(() => (window.print = () => {}));
+    await page.click('#exportButton');
+    await page.click('[data-export="packet"]');
+    const s = await snapshot();
+    const rows = await page.locator('#packet .packet-table tbody tr').count();
+    assert.equal(rows, s.selectedScore.sites.length);
+    const text = await page.locator('#packet').evaluate((el) => el.textContent);
+    for (const phrase of ['Closure packet', 'PD-119SPE', '48 hours', 'Access screen'])
+      assert.ok(text.includes(phrase), phrase);
+    assert.ok(await page.evaluate(() => document.body.classList.contains('printing-packet')));
+    assert.equal(await page.locator('#packet svg circle').count(), rows);
   });
 
   await step('page does not scroll sideways at phone width', async () => {

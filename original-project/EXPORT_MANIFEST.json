@@ -1,7 +1,8 @@
 {
   "project": "Richmond Race Lab",
-  "model_version": "2.0",
-  "source_commit": "8687a79cd5a38874eac86f0d5b36480d41941951",
+  "model_version": "3.0",
+  "dataset_version": "richmond-centerlines-2026-11-02-64e8dbb27033",
+  "exported": "2026-11-02",
   "files": {
     ".gitignore": {
       "bytes": 79,
@@ -11,53 +12,81 @@
       "bytes": 106,
       "sha256": "2fe3627322b90058daa8c72d777d1f83052c7963a8c6cba3448f248d48f34146"
     },
+    ".prettierrc.json": {
+      "bytes": 67,
+      "sha256": "5bb29b7a52c64de79e687e76e814f5647587d000211ef51954a12cacf1805fdc"
+    },
     "README.md": {
-      "bytes": 9758,
-      "sha256": "75507aa8243b113b7be767ef959b1bc3e55394c13e14c4de427252e710824bda"
+      "bytes": 18139,
+      "sha256": "99e04d3e9e4e8232c34eed695c7296bd1ca47795858ac3ab4f024f62d1910380"
+    },
+    "START_HERE.md": {
+      "bytes": 1624,
+      "sha256": "153425747d013c936a3a08a2e6dfad89bb1d3f073bcd7415d8bf2d00882b31db"
     },
     "dist/app.js": {
-      "bytes": 51759,
-      "sha256": "6752eb3bce2b1b18a71743cfdc815f0e173b8824ac5ac6dbd286fb356d736f3e"
+      "bytes": 74074,
+      "sha256": "46811a68f1ad990fcc7a2fede9c6556f930dcc328b0d5873885707ae38e32293"
     },
     "dist/data.js": {
-      "bytes": 4222647,
-      "sha256": "8eec0281f10af62316aad1b9b48da508ec905d0f04773fb3001e9e63bbd50a9d"
+      "bytes": 4626101,
+      "sha256": "ed6ac8b49283ad5db40de78b7fae41960651db4d6c3bc67f329c488021f36e40"
     },
     "dist/favicon.svg": {
       "bytes": 337,
       "sha256": "c0b4b64ec4e9a282a74ea31caddac59e70fae2c97278173a4e3f093c8ac82325"
     },
     "dist/index.html": {
-      "bytes": 21441,
-      "sha256": "b71f3bcc2ea1903580baa4f95c65681721b6eb5537b5c69d0c59dda17967d35e"
+      "bytes": 31056,
+      "sha256": "1c6539c597543c424c49a8d7c97e970c7e0bb991d422de7c6f7c065d5a2452cf"
     },
     "dist/model.js": {
-      "bytes": 12457,
-      "sha256": "3f80857ae4ddadb81cfc32509bd2487cd2b12c343d63aaf238caa68e06ce9c79"
+      "bytes": 39011,
+      "sha256": "5d21fbbfaaa79d00bd2ab51ad19287f5f304aecd068b7969b4df2f835c66fdbe"
     },
     "dist/planning.js": {
-      "bytes": 8153,
-      "sha256": "23b34f24f467d8e50b84ef48438f41803e8778ad1d11caf2a4e5b61e6b3cc31d"
+      "bytes": 12468,
+      "sha256": "0869fc60214ff223046af3490760feba59a8f6f44230b5a7032d1c62b0c1d9da"
     },
     "dist/style.css": {
-      "bytes": 31277,
-      "sha256": "d39ab931ba909a582defd8483d68f0441edafd3bd6f8865c633575129ff08bfb"
+      "bytes": 40709,
+      "sha256": "638d8b61c2ba6fbb244f5efc320c636e31f6846a2ce176cd8fd4049f38d6c5ca"
+    },
+    "eslint.config.mjs": {
+      "bytes": 685,
+      "sha256": "0941c7accb17be16293aef42aa32906bf92c251957c92e779ee85a59c3c85b0b"
+    },
+    "package-lock.json": {
+      "bytes": 39770,
+      "sha256": "a350767a2eaf7da69dc219e47bc3c0c632326c46c9e532c4e64653c146c2860c"
+    },
+    "package.json": {
+      "bytes": 977,
+      "sha256": "bc8ef16f953bd92346e09565de74a61b984a3befce5795309afb4954b47e834f"
     },
     "tests/model.test.cjs": {
-      "bytes": 3840,
-      "sha256": "434955b3824819f26c48e884669b9f67ee950576b7a5b07d4ccd4bc07db892de"
+      "bytes": 4523,
+      "sha256": "767be00017eab4905bab41347180e44f9af2bbad85a6f831015144aa27656271"
     },
     "tests/planning.test.cjs": {
-      "bytes": 4235,
-      "sha256": "b7e46b0786630da3635f10147a29182a1bb81cc7479ff9f201138628270d9652"
+      "bytes": 5331,
+      "sha256": "d2678c1256ff8d5a42cb0ff70e234cbba4faaa46bcdaf29e71fc3820801ae65f"
+    },
+    "tests/regression.test.cjs": {
+      "bytes": 9909,
+      "sha256": "95de728d8838700853f85e925913e589ef5821bbfd1ad691d5f8976421fc0e0b"
+    },
+    "tests/ui.test.cjs": {
+      "bytes": 13855,
+      "sha256": "40611e89ea16574c8ee3f4e2002cfe374dc64ee5051431985442e19d877c5754"
     },
     "tools/build_data.py": {
       "bytes": 3315,
       "sha256": "09b6cf54f19c506dafa5e5aa8ec8cb837b0dc7bfa57235b0ba9b0380b67e9c08"
     },
     "tools/enrich_data.py": {
-      "bytes": 6979,
-      "sha256": "aeb6d1785e00baadd3b944e3b2656fddde8af990a97ecc72ddbe445ce5cc78c6"
+      "bytes": 7908,
+      "sha256": "46d07f0736a630551b7cef2eee6979b240ebc258b4e99f5da871681996e98faa"
     },
     "tools/enrichment-raw.json": {
       "bytes": 1092635,
@@ -70,6 +99,10 @@
     "tools/raw-streets.json": {
       "bytes": 4052413,
       "sha256": "27d7a65ab94e669492a2ffe57bfd57e154426b446aedc562159298025e8952cc"
+    },
+    "tools/serve.cjs": {
+      "bytes": 1258,
+      "sha256": "c3d365aad60197f355bfbbae041edeb9db191c183da8f5dd74915a197c1d2ac0"
     }
   }
 }

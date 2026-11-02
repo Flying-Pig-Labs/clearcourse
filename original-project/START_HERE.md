@@ -1,31 +1,34 @@
-# Richmond Race Lab v2 — complete project export
+# Richmond Race Lab v3 — complete project export
 
 ## Run locally
 
-Python 3 is enough to serve the app; there is no dependency installation or build step.
+Node.js or Python 3 is enough to serve the app; there is no build step.
 
-    cd Richmond_Race_Lab_v2
-    python3 -m http.server 8000 --directory dist
+    cd Richmond_Race_Lab_v3
+    node tools/serve.cjs 8000
+    # or: python3 -m http.server 8000 --directory dist
 
 Open http://localhost:8000 in your browser. The bundled GIS snapshot is included.
 
-## Run the tests
+## Run the checks
 
-With Node.js installed:
-
-    node tests/model.test.cjs
-    node tests/planning.test.cjs
+    npm install          # Prettier and ESLint only
+    npm test             # model, planning and regression suites
+    npm run lint
+    npm run format:check
+    npm i -D playwright && npx playwright install chromium
+    npm run test:ui      # 13 browser tests
 
 ## Contents
 
-- dist/: complete static app and bundled Richmond GIS data
-- tests/: model, constraints, access-screen and calibration tests
-- tools/: GIS ingestion, graph preparation and enrichment scripts
+- dist/: complete static app and bundled Richmond GIS data (dataset richmond-centerlines-2026-11-02-64e8dbb27033)
+- tests/: model, planning, regression and browser tests
+- tools/: GIS ingestion, graph preparation, enrichment and a static server
 - tools/raw-streets.json and tools/enrichment-raw.json: input snapshots
-- README.md: model, data provenance, assumptions and remaining validation work
-- .openai/hosting.json: the existing Sites project configuration
-- EXPORT_MANIFEST.json: source revision and SHA-256 hashes of exported project files
+- README.md: model, distance, import matching, data provenance, assumptions, version 3 changes and remaining validation work
+- .openai/hosting.json: the existing ChatGPT Sites configuration; other hosts ignore it
+- EXPORT_MANIFEST.json: SHA-256 hashes of exported project files
 
-The two original ingestion scripts use export-relative paths in this ZIP so they can run from another directory. Their app/model behavior is unchanged. No Git history, repository credentials, browser-local sessions or actual staffing observations are included. Browser-local work can be downloaded separately through the app's Export → Full session option.
+No Git history, repository credentials, browser-local sessions or actual staffing observations are included. Browser-local work can be downloaded through the app's Export → Full session option. Version-1 session files and browser sessions migrate automatically.
 
 Staffing and access outputs remain planning estimates pending local validation. See README.md for limitations and source details.

@@ -1,34 +1,154 @@
-const assert=require('node:assert/strict');
-const M=require('../dist/model.js'),P=require('../dist/planning.js');
-const d={nodes:[[0,0],[100,0],[100,100],[0,100],[200,0],[100,200],[-100,100]],edges:[],signals:[{p:[100,0],id:1,location:'Example signal',status:'In Service'},{p:[100,100],id:2,status:'Retired'}],facilities:[{p:[100,0],name:'Fixture hospital',kind:'Hospital',sourceId:1}]};
-const add=(a,b,c=0,extra={})=>d.edges.push({a,b,c,n:'Road '+a+'-'+b,l:100,p:[d.nodes[a],d.nodes[b]],publicRoad:true,...extra});
-add(0,1);add(1,2);add(2,3);add(3,0);add(1,4,3,{adt:{value:20000,year:2025},speed:40});add(2,5,1);add(3,6);
-const net=M.createNetwork(d),route=net.via([0,1,2,3,0]),sc=M.evaluate(net,route);
-assert.equal(sc.coverage.signals,1);assert.equal(sc.coverage.traffic,1);assert.equal(sc.coverage.speed,1);
-assert.equal(sc.components.hierarchy,10);assert.equal(sc.components.signals,2);assert.equal(sc.components.traffic,.6);assert.equal(sc.components.speed,1);assert.equal(sc.index,13.6);
-assert.equal(sc.peak,5,'New GIS factors must not invent police staffing rules');
-assert.equal(M.evaluate(net,route,{...M.DEFAULTS,signalOfficers:1}).peak,6,'A declared signal staffing assumption should apply');
-assert.ok(P.constraints(net,route,{target:500,tolerance:.02}).some(v=>v.includes('Distance')));
-assert.ok(P.constraints(net,route,{required:['Missing Street']}).some(v=>v.includes('Required')));
-assert.ok(P.constraints(net,route,{avoid:['Road 1-4']}).some(v=>v.includes('keep-open')),'An arterial crossing must trigger a keep-open check even if route does not follow that arterial');
-assert.ok(P.constraints(net,route,{maxPeak:1}).some(v=>v.includes('cap')));
-assert.deepEqual(P.constraints(net,route,{target:400,tolerance:.02,required:['Road 0-1']}),[]);
-assert.deepEqual(P.parseCSV('site_id,note\r\n1,"A, B"\r\n2,"line1\nline2"'),[['site_id','note'],['1','A, B'],['2','line1\nline2']]);
-assert.throws(()=>P.parseCSV('site_id,note\n1,"unfinished'),/unfinished/);
-const imported=P.importActuals('site_id,actual_officers,actual_barricades,actual_hours,note\n1,0,5,2,"one, note"\n999,1,2,3,unknown',sc,'route');
-assert.equal(imported.records.length,1);assert.equal(imported.records[0].officers,0);assert.deepEqual(imported.unmatched,['999']);
-const cal=P.calibration(sc,imported.records);assert.equal(cal.metrics.officers.mae,3);assert.equal(cal.metrics.barriers.mae,2);assert.equal(P.calibration(sc,[]).metrics.officers.mae,null,'No ground truth must stay unmeasured');
-assert.throws(()=>P.importActuals('site_id,actual_officers\n1,-1',sc,'route'),/Invalid/);
-assert.throws(()=>P.importActuals('site_id,actual_officers\n1,2\n1,3',sc,'route'),/Duplicate/);
-assert.throws(()=>P.importActuals('site_id,actual_officers,route_id\n1,2,other',sc,'route'),/different route/);
-assert.throws(()=>P.importActuals('site_id,actual_officers,dataset_version\n1,2,old',sc,'route'),/different street snapshot/);
-const screening=P.screenAccess(net,route);assert.equal(screening.screened,1);assert.ok(screening.closedEdges>=4);assert.equal(screening.facilities[0].name,'Fixture hospital');
-const isolated={nodes:[[0,0],[100,0],[200,0],[100,100]],edges:[{a:0,b:1,c:0,l:100,n:'A',publicRoad:true},{a:1,b:2,c:0,l:100,n:'B',publicRoad:true},{a:1,b:3,c:0,l:100,n:'C',publicRoad:true}],facilities:[{p:[200,0],name:'Isolated test',kind:'EMS'}]};
-const result=P.screenAccess(M.createNetwork(isolated),{nodes:[1,2],edges:[1],length:100});assert.equal(result.facilities[0].status,'closed-node','A facility snapped to a closed endpoint must be flagged');assert.equal(result.warnings.length,1);
-const paired={nodes:[[0,0],[100,0],[0,15],[100,15]],edges:[{a:0,b:1,c:3,n:'Broad',l:100,publicRoad:true},{a:2,b:3,c:3,n:'Broad',l:100,publicRoad:true}],facilities:[]};
-assert.equal(P.closedEdges(M.createNetwork(paired),{edges:[0]}).size,2,'Paired carriageways need closure screening');
-(async()=>{
- await assert.rejects(M.generate(net,{start:0,target:400,constraints:{avoid:['Road 0-1']}}),/start touches/);
- await assert.rejects(M.generate(net,{start:0,target:400,constraints:{required:['No such road']}}),/not found/);
- console.log('All enrichment, constraints, access-screen and calibration tests passed.');
-})().catch(e=>{console.error(e);process.exitCode=1;});
+const assert = require('node:assert/strict');
+const M = require('../dist/model.js'),
+  P = require('../dist/planning.js');
+const d = {
+  nodes: [
+    [0, 0],
+    [100, 0],
+    [100, 100],
+    [0, 100],
+    [200, 0],
+    [100, 200],
+    [-100, 100],
+  ],
+  edges: [],
+  signals: [
+    { p: [100, 0], id: 1, location: 'Example signal', status: 'In Service' },
+    { p: [100, 100], id: 2, status: 'Retired' },
+  ],
+  facilities: [{ p: [100, 0], name: 'Fixture hospital', kind: 'Hospital', sourceId: 1 }],
+};
+const add = (a, b, c = 0, extra = {}) =>
+  d.edges.push({
+    a,
+    b,
+    c,
+    n: 'Road ' + a + '-' + b,
+    l: 100,
+    p: [d.nodes[a], d.nodes[b]],
+    publicRoad: true,
+    ...extra,
+  });
+add(0, 1);
+add(1, 2);
+add(2, 3);
+add(3, 0);
+add(1, 4, 3, { adt: { value: 20000, year: 2025 }, speed: 40 });
+add(2, 5, 1);
+add(3, 6);
+const net = M.createNetwork(d),
+  route = net.via([0, 1, 2, 3, 0]),
+  sc = M.evaluate(net, route);
+assert.equal(sc.coverage.signals, 1);
+assert.equal(sc.coverage.traffic, 1);
+assert.equal(sc.coverage.speed, 1);
+assert.equal(sc.components.hierarchy, 10);
+assert.equal(sc.components.signals, 2);
+assert.equal(sc.components.traffic, 0.6);
+assert.equal(sc.components.speed, 1);
+assert.equal(sc.index, 13.6);
+assert.equal(sc.peak, 5, 'New GIS factors must not invent police staffing rules');
+assert.equal(
+  M.evaluate(net, route, { ...M.DEFAULTS, signalOfficers: 1 }).peak,
+  6,
+  'A declared signal staffing assumption should apply'
+);
+assert.ok(P.constraints(net, route, { target: 500, tolerance: 0.02 }).some((v) => v.includes('Distance')));
+assert.ok(P.constraints(net, route, { required: ['Missing Street'] }).some((v) => v.includes('Required')));
+assert.ok(
+  P.constraints(net, route, { avoid: ['Road 1-4'] }).some((v) => v.includes('keep-open')),
+  'An arterial crossing must trigger a keep-open check even if route does not follow that arterial'
+);
+assert.ok(P.constraints(net, route, { maxPeak: 1 }).some((v) => v.includes('cap')));
+assert.deepEqual(P.constraints(net, route, { target: 400, tolerance: 0.02, required: ['Road 0-1'] }), []);
+assert.deepEqual(P.parseCSV('site_id,note\r\n1,"A, B"\r\n2,"line1\nline2"'), [
+  ['site_id', 'note'],
+  ['1', 'A, B'],
+  ['2', 'line1\nline2'],
+]);
+assert.throws(() => P.parseCSV('site_id,note\n1,"unfinished'), /unfinished/);
+// Worksheets must carry the route ID and dataset version they were exported with.
+const DS = 'test-dataset';
+
+const imported = P.importActuals(
+  'site_id,route_id,dataset_version,actual_officers,actual_barricades,actual_hours,note\n' +
+    `1,route,${DS},0,5,2,"one, note"\n999,route,${DS},1,2,3,unknown`,
+  sc,
+  'route',
+  DS
+);
+assert.equal(imported.records.length, 1);
+assert.equal(imported.records[0].officers, 0);
+assert.deepEqual(imported.unmatched, ['999']);
+const cal = P.calibration(sc, imported.records);
+assert.equal(cal.metrics.officers.mae, 3);
+assert.equal(cal.metrics.barriers.mae, 2);
+assert.equal(P.calibration(sc, []).metrics.officers.mae, null, 'No ground truth must stay unmeasured');
+const head = `site_id,route_id,dataset_version,actual_officers\n`;
+assert.throws(() => P.importActuals(head + `1,route,${DS},-1`, sc, 'route', DS), /Invalid/);
+assert.throws(() => P.importActuals(head + `1,route,${DS},2\n1,route,${DS},3`, sc, 'route', DS), /Duplicate/);
+assert.throws(() => P.importActuals(head + `1,other,${DS},2`, sc, 'route', DS), /different route/);
+assert.throws(() => P.importActuals(head + `1,route,old,2`, sc, 'route', DS), /different street snapshot/);
+assert.throws(
+  () => P.importActuals('site_id,actual_officers\n1,2', sc, 'route', DS),
+  /route_id and dataset_version/,
+  'A worksheet without its route and dataset IDs must be rejected'
+);
+
+const screening = P.screenAccess(net, route);
+assert.equal(screening.screened, 1);
+assert.ok(screening.closedEdges >= 4);
+assert.equal(screening.facilities[0].name, 'Fixture hospital');
+const isolated = {
+  nodes: [
+    [0, 0],
+    [100, 0],
+    [200, 0],
+    [100, 100],
+  ],
+  edges: [
+    { a: 0, b: 1, c: 0, l: 100, n: 'A', publicRoad: true },
+    { a: 1, b: 2, c: 0, l: 100, n: 'B', publicRoad: true },
+    { a: 1, b: 3, c: 0, l: 100, n: 'C', publicRoad: true },
+  ],
+  facilities: [{ p: [200, 0], name: 'Isolated test', kind: 'EMS' }],
+};
+const result = P.screenAccess(M.createNetwork(isolated), { nodes: [1, 2], edges: [1], length: 100 });
+assert.equal(
+  result.facilities[0].status,
+  'closed-node',
+  'A facility snapped to a closed endpoint must be flagged'
+);
+assert.equal(result.warnings.length, 1);
+const paired = {
+  nodes: [
+    [0, 0],
+    [100, 0],
+    [0, 15],
+    [100, 15],
+  ],
+  edges: [
+    { a: 0, b: 1, c: 3, n: 'Broad', l: 100, publicRoad: true },
+    { a: 2, b: 3, c: 3, n: 'Broad', l: 100, publicRoad: true },
+  ],
+  facilities: [],
+};
+assert.equal(
+  P.closedEdges(M.createNetwork(paired), { edges: [0] }).size,
+  2,
+  'Paired carriageways need closure screening'
+);
+(async () => {
+  await assert.rejects(
+    M.generate(net, { start: 0, target: 400, constraints: { avoid: ['Road 0-1'] } }),
+    /start touches/
+  );
+  await assert.rejects(
+    M.generate(net, { start: 0, target: 400, constraints: { required: ['No such road'] } }),
+    /not found/
+  );
+  console.log('All enrichment, constraints, access-screen and calibration tests passed.');
+})().catch((e) => {
+  console.error(e);
+  process.exitCode = 1;
+});

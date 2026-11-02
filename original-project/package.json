@@ -1,1 +1,22 @@
-{"type":"commonjs","private":true}
+{
+  "name": "richmond-race-lab",
+  "version": "3.0.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Browser-local race-route closure and staffing planning prototype for Richmond, Virginia.",
+  "scripts": {
+    "serve": "node tools/serve.cjs",
+    "test": "node tests/model.test.cjs && node tests/planning.test.cjs && node tests/regression.test.cjs",
+    "test:ui": "node tests/ui.test.cjs",
+    "lint": "eslint dist/model.js dist/planning.js dist/app.js tests tools/serve.cjs",
+    "format": "prettier --write dist/model.js dist/planning.js dist/app.js dist/style.css dist/index.html tests tools/serve.cjs",
+    "format:check": "prettier --check dist/model.js dist/planning.js dist/app.js dist/style.css dist/index.html tests tools/serve.cjs",
+    "check": "npm run format:check && npm run lint && npm test && npm run test:ui"
+  },
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "@eslint/js": "9.39.5",
+    "globals": "16.5.0",
+    "prettier": "3.9.10"
+  }
+}

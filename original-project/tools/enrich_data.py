@@ -1,5 +1,5 @@
 """Fetch authoritative spatial supplements; preserve the original graph IDs."""
-import json, urllib.request, urllib.parse, pathlib, concurrent.futures, math, re, collections
+import json, urllib.request, urllib.parse, pathlib, concurrent.futures, math, re, collections, hashlib
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 CITY='https://services1.arcgis.com/k3vhq11XkBNeeOfM/ArcGIS/rest/services/'
 TRAFFIC='https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOT_Bidirectional_Traffic_Volume_2025/FeatureServer/0'
@@ -11,6 +11,13 @@ def get(url,params=None):
 def inspect(kv):
  name,u=kv;d=get(u,{'f':'json'});print(name,[(x['name'],x.get('alias')) for x in d.get('fields',[])],flush=True)
 
+FUNCTIONAL={'Local':0,'Collector':1,'Minor Arterial':2,'Principal Arterial':3}
+LIMITED_ACCESS_TYPES={'Ramp','Highway','Highway Interchange'}
+LIMITED_ACCESS_CLASSES={'Freeway','Interchange Ramps'}
+def dataset_version(d):
+ """Hash of the street graph. Worksheets and sessions store node and edge IDs, which are only valid for this graph."""
+ graph=json.dumps({'nodes':d['nodes'],'edges':[[e['a'],e['b'],e['source'],e['c']] for e in d['edges']]},separators=(',',':'))
+ return 'richmond-centerlines-'+d['source']['retrieved']+'-'+hashlib.sha256(graph.encode()).hexdigest()[:12]
 def xy(p):return [round((p[0]+77.46)*88152,2),round((37.56-p[1])*111195,2)]
 def distance_segment(p,a,b):
  dx,dy=b[0]-a[0],b[1]-a[1];t=max(0,min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy or 1)))
@@ -90,7 +97,11 @@ if __name__=='__main__':
  old=json.loads((ROOT/'tools/raw-streets.json').read_text());attrs={f['attributes']['OBJECTID']:f['attributes'] for f in old['features']}
  for e in d['edges']:
   a=attrs.get(e['source'],{});e['oneWay']=a.get('OneWay');e['publicRoad']=a.get('StreetType') not in ['Private','Alley',None];e['roadType']=a.get('StreetType')
+  # Functional class for every edge, including roads excluded from routing, and a freeway-connection flag.
+  e['fc']=FUNCTIONAL.get(a.get('FunctionalClass'))
+  e['limitedAccess']=a.get('StreetType') in LIMITED_ACCESS_TYPES or a.get('FunctionalClass') in LIMITED_ACCESS_CLASSES
  d['signals']=signal_points;d['facilities']=facilities
+ d['datasetVersion']=dataset_version(d)
  d['enrichment']={'version':'2026-11-02.2','retrieved':'2026-11-02','signals':{'url':specs[0][1],'records':len(raw['signals']),'points':len(signal_points),'status':'available'},'traffic':{'url':TRAFFIC,'year':2025,'records':len(raw['traffic']),'matchedEdges':matches,'status':'available','match':'Geometry alignment; not field-verified'},'facilities':{'url':CITY+'HealthAndSafety1/FeatureServer','records':len(facilities),'status':'available'},'notes':'Sources are GIS snapshots. Absence of a match means unknown, not zero. ADT is an annual daily average, not race-day volume. Facilities may be outdated or misclassified.'}
  (ROOT/'dist/data.js').write_text('window.RACE_DATA='+json.dumps(d,separators=(',',':'))+';\n')
- print('Enriched:',len(signal_points),'signal points,',matches,'ADT-matched street edges,',len(facilities),'facilities',flush=True)
+ print('Enriched:',len(signal_points),'signal points,',matches,'ADT-matched street edges,',len(facilities),'facilities; dataset',d['datasetVersion'],flush=True)

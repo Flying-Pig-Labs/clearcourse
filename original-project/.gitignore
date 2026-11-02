@@ -4,7 +4,3 @@ tools/raw-streets.json
 *.log
 
 tools/enrichment-raw.json
-
-# Lovable migration: keep original source/data tracked for reproducible tests
-!tools/raw-streets.json
-!tools/enrichment-raw.json

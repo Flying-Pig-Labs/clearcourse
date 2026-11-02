@@ -1,54 +1,652 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#173e30"><meta name="description" content="Explore Richmond race routes and compare transparent, editable estimates of closure burden and staffing.">
-<title>Richmond Race Lab · Route planning prototype</title>
-<link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css">
-</head>
-<body>
-<header class="topbar">
-  <a class="brand" href="./" aria-label="Richmond Race Lab home"><span class="brand-symbol"><svg viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M7 21V10a4 4 0 0 1 8 0v8a3 3 0 0 0 6 0V7" stroke="currentColor" stroke-width="2.7" stroke-linecap="round"/><circle cx="7" cy="22" r="3" fill="currentColor"/><circle cx="21" cy="6" r="3" stroke="currentColor" stroke-width="2"/></svg></span><span>Race Lab<span class="brand-sub">RICHMOND, VIRGINIA</span></span></a>
-  <nav aria-label="Workspace"><button class="nav-active" id="planNav">Route workspace</button><button id="modelNav">Model & sources <span aria-hidden="true">↗</span></button></nav>
-  <div class="header-actions"><span class="prototype"><span></span> Research update · v2</span><div class="export-wrap"><button class="button outline" id="exportButton">Export <span aria-hidden="true">↗</span></button><div class="export-menu" id="exportMenu" hidden><button data-export="geojson">Route · GeoJSON</button><button data-export="csv">Closure worksheet · CSV</button><button data-export="json">Full session · JSON</button><button data-export="print">Print planning brief</button></div></div></div>
-</header>
-<main>
-  <section class="intro"><div><div class="eyebrow">CIVIC EXPERIMENT / 001</div><h1>Every route has a footprint.</h1><p>Explore the streets. Compare the closures. Understand the staffing.</p></div><div class="intro-note"><span class="note-icon">i</span><span>Real Richmond streets.<br><strong>Illustrative staffing assumptions.</strong></span></div></section>
-  <section class="brief" aria-label="Race requirements"><div class="brief-title"><span class="step">01</span><div><strong>Set the brief</strong><span>A starting point for the conversation</span></div></div>
-    <div class="brief-controls"><div class="field"><label>Race distance</label><div class="segmented" id="distanceButtons"><button class="active" data-distance="5">5K</button><button data-distance="10">10K</button><button data-distance="custom">Custom</button></div></div>
-      <div class="field custom-distance" id="customDistanceWrap" hidden><label for="customDistance">Kilometers</label><input id="customDistance" type="number" min="1" max="15" step="0.1" value="7.5"></div>
-      <div class="field"><label for="areaSelect">Start area</label><select id="areaSelect"><option value="0">The Fan</option><option value="1">Monroe Ward</option><option value="2">Byrd Park</option><option value="map" hidden>Picked on map</option></select></div>
-      <div class="field"><label for="characterSelect">Route preference</label><select id="characterSelect"><option value="balanced">Balanced</option><option value="local">Favor smaller streets</option><option value="turns">Favor fewer turns</option></select></div>
-      <button class="button primary" id="generateButton"><span aria-hidden="true">✧</span> Explore routes <span aria-hidden="true">→</span></button>
-    </div>
-  </section>
-  <details class="constraint-bar"><summary>Route constraints <span>Distance tolerance, keep-open streets and staffing cap</span></summary><div class="constraint-fields"><label>Distance tolerance · %<input id="briefTolerance" type="number" min="1" max="10" step="1" value="2"></label><label>Keep these streets open<input id="briefAvoid" list="streetNames" placeholder="Exact street names, separated by commas"></label><label>Required streets<input id="briefRequired" list="streetNames" placeholder="Visit at least one segment of each street"></label><label>Maximum estimated officers<input id="briefMaxPeak" type="number" min="0" max="500" placeholder="No cap"></label><button class="button primary" id="applyBrief">Apply & explore →</button></div><p>Keep-open streets also block candidate routes through their mapped intersections. Requirements are planning constraints, not approval. The search can fail to find a feasible route even when one exists.</p><datalist id="streetNames"></datalist></details>
-  <section class="workspace">
-    <div class="map-column">
-      <div class="map-card">
-        <div class="map-heading"><div><span class="tiny-label">ROUTE EXPLORER</span><strong id="mapRouteName">Finding a starting route…</strong></div><div class="map-heading-actions"><button class="button small outline" id="drawButton"><span aria-hidden="true">⌁</span> Draw route</button><button class="button small outline" id="importButton">Import <span aria-hidden="true">↑</span></button></div></div>
-        <div class="draw-banner" id="drawBanner" hidden><div><strong>Draw your proposed route</strong><span>Click streets to add waypoints. Paths snap to the street network.</span></div><div><button id="undoPoint">Undo</button><button id="closeLoop">Close loop</button><button class="save-draw" id="scoreDraw">Score route</button><button id="cancelDraw" aria-label="Cancel drawing">×</button></div></div>
-        <div class="map-stage" id="mapStage"><svg id="map" role="img" aria-label="Interactive Richmond street map with race routes and estimated closure review locations" tabindex="0"><g id="baseLayer"></g><g id="labelLayer"></g><g id="ghostLayer"></g><g id="routeLayer"></g><g id="siteLayer"></g><g id="waypointLayer"></g></svg>
-          <div class="map-top"><span class="map-location"><span aria-hidden="true">◎</span> Richmond, VA</span><button class="map-start" id="pickStartButton">Choose start on map</button></div>
-          <div class="map-controls"><button id="zoomIn" aria-label="Zoom in">+</button><button id="zoomOut" aria-label="Zoom out">−</button><button id="fitMap" aria-label="Fit route to map"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m6 0h4v-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button></div>
-          <div class="map-legend"><span><i class="route-dot"></i>Selected route</span><span><i class="local-dot"></i>Local / collector</span><span><i class="major-dot"></i>Arterial</span></div>
-          <div class="map-source">Street geometry: Richmond DPW · Snapshot Nov 2, 2026</div><div class="scale" id="mapScale"></div>
-          <div class="map-tooltip" id="mapTooltip" hidden></div><div class="map-loading" id="mapLoading"><span class="spinner"></span><strong>Exploring Richmond’s streets</strong><span id="loadingDetail">Building comparable route candidates…</span></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#173e30" />
+    <meta
+      name="description"
+      content="Explore Richmond race routes and compare transparent, editable estimates of closure burden and staffing."
+    />
+    <title>Richmond Race Lab · Route planning prototype</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Richmond Race Lab home"
+        ><span class="brand-symbol"
+          ><svg viewBox="0 0 28 28" fill="none" aria-hidden="true">
+            <path
+              d="M7 21V10a4 4 0 0 1 8 0v8a3 3 0 0 0 6 0V7"
+              stroke="currentColor"
+              stroke-width="2.7"
+              stroke-linecap="round"
+            />
+            <circle cx="7" cy="22" r="3" fill="currentColor" />
+            <circle cx="21" cy="6" r="3" stroke="currentColor" stroke-width="2" /></svg></span
+        ><span>Race Lab<span class="brand-sub">RICHMOND, VIRGINIA</span></span></a
+      >
+      <nav aria-label="Workspace">
+        <button class="nav-active" id="planNav">Route workspace</button
+        ><button id="modelNav">Model & sources <span aria-hidden="true">↗</span></button>
+      </nav>
+      <div class="header-actions">
+        <span class="prototype"><span></span> Research update · v3</span>
+        <div class="export-wrap">
+          <button class="button outline" id="exportButton">Export <span aria-hidden="true">↗</span></button>
+          <div class="export-menu" id="exportMenu" hidden>
+            <button data-export="geojson">Route · GeoJSON</button
+            ><button data-export="csv">Closure worksheet · CSV</button
+            ><button data-export="worksheet">Observation worksheet · CSV</button
+            ><button data-export="json">Full session · JSON</button
+            ><button data-export="print">Print planning brief</button>
+          </div>
         </div>
-        <div class="map-footer"><span id="routeStatus">Generated street loop · Example route</span><span class="access-status"><span></span> Access review pending</span></div>
       </div>
-      <div class="metrics" id="metrics" aria-live="polite"></div>
-    </div>
-    <aside class="route-panel"><div class="panel-heading"><div><span class="step">02</span><strong>Compare the options</strong></div><span id="optionCount">—</span></div><p class="panel-help">Same brief. Different tradeoffs.</p><div id="routeCards"></div><div class="route-note" id="routeNote"></div><div class="drivers"><div class="drivers-heading"><strong>Where the work adds up</strong><span>HIGHEST WEIGHT</span></div><div id="driversList"></div></div><button class="assumptions-link" id="assumptionsButton"><span>Adjust the staffing model</span><span aria-hidden="true">↗</span></button><p class="model-disclaimer">Index v2 combines road class, approaches, matched signals, 2025 ADT and posted speed. Missing data stays unknown. Staffing assumptions remain uncalibrated.</p></aside>
-  </section>
-  <section class="analysis-section"><div class="analysis-header"><div><div class="eyebrow">EXPLAIN / SCREEN / VALIDATE</div><h2>More than a single score.</h2></div><span class="revision-badge" id="revisionBadge">Model v2 · Rules r1</span></div><div id="briefStatus" class="brief-status" role="status"></div><div class="analysis-grid"><article class="analysis-card"><h3>What makes up the burden?</h3><p>Raw points, with editable weights. No hidden 100-point scale.</p><div id="componentBars"></div><div id="coverageSummary" class="coverage-summary"></div></article><article class="analysis-card access-card"><div class="analysis-card-top"><h3>Access & disruption screen</h3><button class="button small outline" id="accessButton">Run screen →</button></div><p>All course segments closed at once, including nearby parallel same-name carriageways. A topology screen, not an emergency response plan.</p><div id="accessSummary"><div class="empty-analysis">Not run for this route.</div></div><label class="map-toggle"><input id="showFacilities" type="checkbox" checked> Show mapped hospitals, EMS, fire and police</label></article></div></section>
-  <section class="timeline-section analysis-card"><div class="analysis-card-top"><div><div class="eyebrow">RESOURCES OVER TIME</div><h2>The staffing window.</h2></div><span class="timeline-legend"><i></i> Setup <i></i> Control <i></i> Clear</span></div><p class="analysis-help">Modeled intervals for the six highest-burden locations. Peaks count overlapping assignments; staffing reuse and travel are not modeled.</p><div id="staffingTimeline"></div><div id="staffingCurve"></div></section>
-  <section class="calibration-section analysis-card"><div class="analysis-card-top"><div><div class="eyebrow">GROUND TRUTH / STILL REQUIRED</div><h2>Compare with a real event.</h2></div><div class="calibration-actions"><button class="button small outline" id="actualTemplate">Download worksheet ↓</button><button class="button small primary" id="importActuals">Import actuals ↑</button></div></div><p class="analysis-help">Fill the worksheet’s actual_officers, actual_barricades or actual_hours columns. Keep the site IDs. Calibrate one event, then test the revised rules on another.</p><div id="calibrationSummary" class="calibration-summary"></div><div id="calibrationTable" class="table-wrap" hidden></div><div id="auditSummary" class="audit-summary"></div></section>
-  <section class="review-section"><div class="review-top"><div><div class="eyebrow">MAKE THE ASSUMPTIONS VISIBLE</div><h2>Every closure, open to review.</h2><p>Inspect a location, change its staffing, and watch the estimates update.</p></div><div class="review-filters"><input id="siteSearch" type="search" placeholder="Find a street…" aria-label="Search closure locations"><select id="siteFilter" aria-label="Filter closure locations"><option value="all">All road classes</option><option value="major">Arterials only</option><option value="edited">Edited locations</option></select></div></div><div class="table-wrap"><table><thead><tr><th>Review location</th><th>Road class</th><th>Officers</th><th>Barricades</th><th>Duty window</th><th>Burden points</th><th><span class="sr-only">Edit</span></th></tr></thead><tbody id="sitesTable"></tbody></table></div><div class="table-footer"><span id="tableCount"></span><button id="showAllSites">Show all locations <span aria-hidden="true">↓</span></button></div></section>
-  <footer class="page-footer"><span class="footer-brand">Race Lab <span>/ A civic planning experiment</span></span><button id="footerSources">Read the model & data notes <span aria-hidden="true">↗</span></button><span>Built for a conversation with the people who plan race day.</span></footer>
-</main>
-<dialog id="modelDialog" class="model-dialog"><div class="dialog-top"><div><span class="eyebrow">TRANSPARENT BY DESIGN</span><h2>The model behind the map.</h2></div><button class="icon-close" data-close="modelDialog" aria-label="Close model">×</button></div><div class="dialog-content"><div class="notice"><strong>Illustrative assumptions · awaiting local calibration</strong><p>The numbers below are editable hypotheses, not Richmond Police staffing requirements. Added GIS attributes change the burden index; they do not establish a staffing mandate. Route candidates are exploratory street loops, not approved courses.</p></div><h3>01 / Weight the roads</h3><p class="help-text">At each route junction, the highest road class among the route and side-street approaches sets the default category. Nearby approaches within 22 m sharing a street name are grouped for review.</p><div class="table-wrap"><table class="rules-table"><thead><tr><th>Road class</th><th>Officers / site</th><th>Barricades / side approach</th><th>Burden weight</th></tr></thead><tbody id="rulesTable"></tbody></table></div><h3>02 / Add interpretable data factors</h3><div class="model-fields"><label>Matched signal · points<input id="settingSignalWeight" type="number" min="0" max="100" step="0.5"></label><label>Per 10,000 ADT · points<input id="settingTrafficWeight" type="number" min="0" max="100" step="0.1"></label><label>Per 10 mph above 30 · points<input id="settingSpeedWeight" type="number" min="0" max="100" step="0.5"></label><label>Extra officers / matched signal<input id="settingSignalOfficers" type="number" min="0" max="20" step="1"></label></div><p class="help-text">These weights are illustrative. A GIS signal or traffic match is evidence for review, not a locally approved staffing rule. ADT is an annual average per day, not race-hour traffic. No match means unknown.</p><h3>03 / Set the time and cost</h3><div class="model-fields"><label>Closure approach<select id="settingMode"><option value="full">Full route closure</option><option value="rolling">Rolling closure estimate</option></select></label><label>Race starts<input id="settingStart" type="time"></label><label>Fastest pace · min/km<input id="settingFast" type="number" min="2" max="30" step="0.5"></label><label>Last-finisher pace · min/km<input id="settingSlow" type="number" min="2" max="30" step="0.5"></label><label>Start wave · minutes<input id="settingWave" type="number" min="0" max="240"></label><label>Setup lead · minutes<input id="settingSetup" type="number" min="0" max="240"></label><label>Clearance tail · minutes<input id="settingClear" type="number" min="0" max="240"></label><label>Officer rate · $/hour<input id="settingRate" type="number" min="0" max="1000"></label><label>Minimum paid shift · hours<input id="settingMinimumShift" type="number" min="0" max="24" step="0.5"></label></div><details class="method-notes" open><summary>How the numbers are calculated</summary><p><strong>Burden index v2</strong> = sum of road-class points + additional-approach points + matched-signal points + ADT points + posted-speed points. Approach points = class weight × 0.2 × additional side approaches; traffic points = ADT / 10,000 × traffic weight; speed points = max(0, posted mph − 30) / 10 × speed weight. Missing data adds no points and is separately reported as unknown. Scores with different data coverage need review. It is a relative comparison index with no 100-point ceiling. Lower means fewer weighted closure demands under this model.</p><p><strong>Officer-hours</strong> = sum of officers at each site × its modeled duty window. <strong>Staffing cost</strong> applies the hourly rate and minimum shift to each site. <strong>Peak officers</strong> is the maximum simultaneous modeled requirement, without redeployment, travel, supervision or relief allowances.</p><p><strong>Full closure:</strong> all sites close before the start and reopen after the last finisher plus clearance. <strong>Rolling estimate:</strong> sites close before the first modeled runner arrives and reopen after the last modeled runner passes. Repeat visits share a continuous duty window.</p><p><strong>Route character:</strong> turns over 45° and repeated street segments are measured separately. Candidate searches sample 64 loop shapes with street-class penalties and up to four distance refinements, then filter by the brief’s tolerance, required streets and staffing cap. Keep-open streets block connected intersections. They do not establish a global optimum or certify distance. Vehicle one-way restrictions are ignored for these hypothetical fully closed race roads. Freeways, ramps, alleys and private streets are excluded from candidate routing.</p></details><details class="method-notes"><summary>Data sources & what still needs validation</summary><p>Street centerlines, functional road classes and geometry: <a href="https://services1.arcgis.com/k3vhq11XkBNeeOfM/ArcGIS/rest/services/CarriagewayCenterlines/FeatureServer" target="_blank" rel="noreferrer">Richmond DPW</a>. Water and park polygons: Richmond GIS. Downloaded November 2, 2026. The bundled study area covers the Fan, downtown and nearby neighborhoods; imports outside the street network are rejected.</p><p>Planning context: <a href="https://rva.gov/police/permits" target="_blank" rel="noreferrer">Richmond Police permit guidance</a> and <a href="https://ops.fhwa.dot.gov/publications/fhwaop04010/chapter13.htm" target="_blank" rel="noreferrer">FHWA street-use event guidance</a>. These sources inform the questions to ask; they do not supply this prototype’s numerical staffing weights.</p><p><strong>Added GIS snapshots:</strong> <a href="https://services1.arcgis.com/k3vhq11XkBNeeOfM/ArcGIS/rest/services/Signalized_Intersections/FeatureServer/15" target="_blank" rel="noreferrer">Richmond signalized intersections</a>; <a href="https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOT_Bidirectional_Traffic_Volume_2025/FeatureServer/0" target="_blank" rel="noreferrer">VDOT 2025 bidirectional traffic volume</a>; <a href="https://services1.arcgis.com/k3vhq11XkBNeeOfM/arcgis/rest/services/HealthAndSafety1/FeatureServer" target="_blank" rel="noreferrer">Richmond health and safety facilities</a>. Retrieved November 2, 2026. Only in-service signal records are matched within 35 m; ADT uses aligned geometry within 25 m at two of three segment samples. Spatial joins and facility records need local verification. Co-located facility records are grouped when their street address or fire-station number agrees; the underlying inventories may classify a shared site differently. Data absence is not evidence of zero traffic or no signal.</p><p><strong>Access screening:</strong> compares undirected public-road connectivity before and after simultaneous closure of the selected segments and nearby parallel same-name carriageways. It ignores one-way and turn restrictions, external roads outside the snapshot, capacity, live traffic and actual emergency access arrangements. Detours are distance-only probes. A connected result is not an access approval; a separated result may reflect study-boundary or GIS errors.</p><p><strong>Calibration:</strong> actual observations stay in this browser and session exports. Errors are calculated only for matched rows with the relevant observed value. No statistical confidence or validated staffing accuracy is claimed before real observations are supplied.</p><p>Before operational use: verify the network and junction grouping, road width, driveway access, course suitability, barricade design, transit, detours, hospitals, emergency access, construction, race-day timing and the traffic-control authority’s staffing rules. No reduction in staffing is validated here.</p></details><p class="local-note">Sessions save in this browser. Download a full session to keep a copy or open it elsewhere.</p><div class="form-error" id="modelError" role="alert"></div></div><div class="dialog-footer"><button class="button outline" id="resetModel">Reset model defaults</button><button class="button primary" id="saveModel">Apply assumptions <span aria-hidden="true">→</span></button></div></dialog>
-<dialog id="siteDialog" class="site-dialog"><div class="dialog-top"><div><span class="eyebrow">LOCATION REVIEW</span><h2 id="siteDialogTitle">Review this junction</h2></div><button class="icon-close" data-close="siteDialog" aria-label="Close location">×</button></div><div class="dialog-content"><div id="siteSummary"></div><div class="model-fields"><label>Review category<select id="siteClass"></select></label><label>Officers at this site<input id="siteOfficers" type="number" min="0" max="100"></label><label>Total barricades<input id="siteBarriers" type="number" min="0" max="100"></label></div><label class="note-label">Override reason (required)<textarea id="siteNote" placeholder="What does the local team know about this location?" rows="3" maxlength="500"></textarea></label><p class="help-text">This edit applies to the selected route. An override is a planning assumption, not an approved staffing decision.</p><div id="siteError" class="form-error" role="alert"></div></div><div class="dialog-footer"><button class="button outline" id="resetSite">Use model defaults</button><button class="button primary" id="saveSite">Save location <span aria-hidden="true">→</span></button></div></dialog>
-<input type="file" id="actualsInput" accept=".csv,text/csv" hidden><input type="file" id="fileInput" accept=".gpx,.geojson,.json,application/json,application/gpx+xml" hidden><div class="toast" id="toast" role="status" hidden></div>
-<script src="data.js"></script><script src="model.js"></script><script src="planning.js"></script><script src="app.js"></script>
-</body></html>
+    </header>
+    <main>
+      <section class="intro">
+        <div>
+          <div class="eyebrow">CIVIC EXPERIMENT / 001</div>
+          <h1>Every route has a footprint.</h1>
+          <p>Explore the streets. Compare the closures. Understand the staffing.</p>
+        </div>
+        <div class="intro-note">
+          <span class="note-icon">i</span
+          ><span>Real Richmond streets.<br /><strong>Illustrative staffing assumptions.</strong></span>
+        </div>
+      </section>
+      <section class="brief" aria-label="Race requirements">
+        <div class="brief-title">
+          <span class="step">01</span>
+          <div><strong>Set the brief</strong><span>A starting point for the conversation</span></div>
+        </div>
+        <div class="brief-controls">
+          <div class="field">
+            <label>Race distance</label>
+            <div class="segmented" id="distanceButtons">
+              <button class="active" data-distance="5">5K</button><button data-distance="10">10K</button
+              ><button data-distance="custom">Custom</button>
+            </div>
+          </div>
+          <div class="field custom-distance" id="customDistanceWrap" hidden>
+            <label for="customDistance">Kilometers</label
+            ><input id="customDistance" type="number" min="1" max="15" step="0.1" value="7.5" />
+          </div>
+          <div class="field">
+            <label for="areaSelect">Start area</label
+            ><select id="areaSelect">
+              <option value="0">The Fan</option>
+              <option value="1">Monroe Ward</option>
+              <option value="2">Byrd Park</option>
+              <option value="map" hidden>Picked on map</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="characterSelect">Route preference</label
+            ><select id="characterSelect">
+              <option value="balanced">Balanced</option>
+              <option value="local">Favor smaller streets</option>
+              <option value="turns">Favor fewer turns</option>
+            </select>
+          </div>
+          <button class="button primary" id="generateButton">
+            <span aria-hidden="true">✧</span> Explore routes <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      </section>
+      <details class="constraint-bar">
+        <summary>
+          Route constraints <span>Distance tolerance, keep-open streets and staffing cap</span>
+        </summary>
+        <div class="constraint-fields">
+          <label
+            >Distance tolerance · %<input
+              id="briefTolerance"
+              type="number"
+              min="1"
+              max="10"
+              step="1"
+              value="2" /></label
+          ><label
+            >Keep these streets open<input
+              id="briefAvoid"
+              list="streetNames"
+              placeholder="Exact street names, separated by commas" /></label
+          ><label
+            >Required streets<input
+              id="briefRequired"
+              list="streetNames"
+              placeholder="Visit at least one segment of each street" /></label
+          ><label
+            >Maximum estimated officers<input
+              id="briefMaxPeak"
+              type="number"
+              min="0"
+              max="500"
+              placeholder="No cap" /></label
+          ><label
+            >Distance basis<select id="briefBasis">
+              <option value="centerline">Street centerline</option>
+              <option value="shortest">Shortest-route estimate</option>
+            </select></label
+          ><button class="button primary" id="applyBrief">Apply & explore →</button>
+        </div>
+        <p>
+          Keep-open streets also block candidate routes through their mapped intersections. Requirements are
+          planning constraints, not approval. The search can fail to find a feasible route even when one
+          exists. Certified courses are measured on the shortest possible route, which cuts corners; the
+          shortest-route basis targets that estimate instead of the street centerline.
+        </p>
+        <datalist id="streetNames"></datalist>
+      </details>
+      <section class="workspace">
+        <div class="map-column">
+          <div class="map-card">
+            <div class="map-heading">
+              <div>
+                <span class="tiny-label">ROUTE EXPLORER</span
+                ><strong id="mapRouteName">Finding a starting route…</strong>
+              </div>
+              <div class="map-heading-actions">
+                <button class="button small outline" id="drawButton">
+                  <span aria-hidden="true">⌁</span> Draw route</button
+                ><button class="button small outline" id="importButton">
+                  Import <span aria-hidden="true">↑</span>
+                </button>
+              </div>
+            </div>
+            <div class="draw-banner" id="drawBanner" hidden>
+              <div>
+                <strong>Draw your proposed route</strong
+                ><span
+                  >Click streets to add waypoints. Each leg follows the shortest street path, and clicking
+                  back along a street retraces it.</span
+                >
+              </div>
+              <div>
+                <button id="undoPoint">Undo</button><button id="closeLoop">Close loop</button
+                ><button class="save-draw" id="scoreDraw">Score route</button
+                ><button id="cancelDraw" aria-label="Cancel drawing">×</button>
+              </div>
+            </div>
+            <div class="map-stage" id="mapStage">
+              <svg
+                id="map"
+                role="img"
+                aria-label="Interactive Richmond street map with race routes and estimated closure review locations"
+                tabindex="0"
+              >
+                <g id="baseLayer"></g>
+                <g id="labelLayer"></g>
+                <g id="ghostLayer"></g>
+                <g id="routeLayer"></g>
+                <g id="siteLayer"></g>
+                <g id="waypointLayer"></g>
+              </svg>
+              <div class="map-top">
+                <span class="map-location"><span aria-hidden="true">◎</span> Richmond, VA</span
+                ><button class="map-start" id="pickStartButton">Choose start on map</button>
+              </div>
+              <div class="map-controls">
+                <button id="zoomIn" aria-label="Zoom in">+</button
+                ><button id="zoomOut" aria-label="Zoom out">−</button
+                ><button id="fitMap" aria-label="Fit route to map">
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path
+                      d="M7 3H3v4m10-4h4v4M3 13v4h4m6 0h4v-4"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div class="map-legend">
+                <span><i class="route-dot"></i>Selected route</span
+                ><span><i class="local-dot"></i>Local / collector</span
+                ><span><i class="major-dot"></i>Arterial</span>
+              </div>
+              <div class="map-source">Street geometry: Richmond DPW · Snapshot Nov 2, 2026</div>
+              <div class="scale" id="mapScale"></div>
+              <div class="map-tooltip" id="mapTooltip" hidden></div>
+              <div class="map-loading" id="mapLoading">
+                <span class="spinner"></span><strong>Exploring Richmond’s streets</strong
+                ><span id="loadingDetail">Building comparable route candidates…</span>
+              </div>
+            </div>
+            <div class="map-footer">
+              <span id="routeStatus">Generated street loop · Example route</span
+              ><span class="access-status"><span></span> Access review pending</span>
+            </div>
+          </div>
+          <div class="metrics" id="metrics" aria-live="polite"></div>
+        </div>
+        <aside class="route-panel">
+          <div class="panel-heading">
+            <div><span class="step">02</span><strong>Compare the options</strong></div>
+            <span id="optionCount">—</span>
+          </div>
+          <p class="panel-help">Same brief. Different tradeoffs.</p>
+          <div id="routeCards"></div>
+          <div class="route-note" id="routeNote"></div>
+          <div class="drivers">
+            <div class="drivers-heading">
+              <strong>Where the work adds up</strong><span>HIGHEST WEIGHT</span>
+            </div>
+            <div id="driversList"></div>
+          </div>
+          <button class="assumptions-link" id="assumptionsButton">
+            <span>Adjust the staffing model</span><span aria-hidden="true">↗</span>
+          </button>
+          <p class="model-disclaimer">
+            Staffing and cost lead the comparison. The burden index combines road class, approaches, matched
+            signals, 2025 ADT and posted speed as a relative weighting. Missing data stays unknown. Staffing
+            assumptions remain uncalibrated.
+          </p>
+        </aside>
+      </section>
+      <section class="analysis-section">
+        <div class="analysis-header">
+          <div>
+            <div class="eyebrow">EXPLAIN / SCREEN / VALIDATE</div>
+            <h2>More than a single score.</h2>
+          </div>
+          <span class="revision-badge" id="revisionBadge">Model v2 · Rules r1</span>
+        </div>
+        <div id="briefStatus" class="brief-status" role="status"></div>
+        <div class="analysis-grid">
+          <article class="analysis-card">
+            <h3>What makes up the burden?</h3>
+            <p>Raw points, with editable weights. No hidden 100-point scale.</p>
+            <div id="componentBars"></div>
+            <div id="coverageSummary" class="coverage-summary"></div>
+          </article>
+          <article class="analysis-card access-card">
+            <div class="analysis-card-top">
+              <h3>Access & disruption screen</h3>
+              <button class="button small outline" id="accessButton">Run screen →</button>
+            </div>
+            <p>
+              All course segments closed at once, including nearby parallel same-name carriageways. A topology
+              screen, not an emergency response plan.
+            </p>
+            <div id="accessSummary"><div class="empty-analysis">Not run for this route.</div></div>
+            <label class="map-toggle"
+              ><input id="showFacilities" type="checkbox" checked /> Show mapped hospitals, EMS, fire and
+              police</label
+            >
+          </article>
+        </div>
+      </section>
+      <section class="timeline-section analysis-card">
+        <div class="analysis-card-top">
+          <div>
+            <div class="eyebrow">RESOURCES OVER TIME</div>
+            <h2>The staffing window.</h2>
+          </div>
+          <span class="timeline-legend"><i></i> Setup <i></i> Control <i></i> Clear</span>
+        </div>
+        <p class="analysis-help">
+          Modeled intervals for the six highest-burden locations. Peaks count overlapping assignments;
+          staffing reuse and travel are not modeled.
+        </p>
+        <div id="staffingTimeline"></div>
+        <div id="staffingCurve"></div>
+      </section>
+      <section class="calibration-section analysis-card">
+        <div class="analysis-card-top">
+          <div>
+            <div class="eyebrow">GROUND TRUTH / STILL REQUIRED</div>
+            <h2>Compare with a real event.</h2>
+          </div>
+          <div class="calibration-actions">
+            <button class="button small outline" id="actualTemplate">Download worksheet ↓</button
+            ><button class="button small primary" id="importActuals">Import actuals ↑</button>
+          </div>
+        </div>
+        <p class="analysis-help">
+          Fill the worksheet’s actual_officers, actual_barricades or actual_hours columns. Keep the site IDs.
+          Calibrate one event, then test the revised rules on another.
+        </p>
+        <div id="calibrationSummary" class="calibration-summary"></div>
+        <div id="calibrationTable" class="table-wrap" hidden></div>
+        <div id="auditSummary" class="audit-summary"></div>
+      </section>
+      <section class="review-section">
+        <div class="review-top">
+          <div>
+            <div class="eyebrow">MAKE THE ASSUMPTIONS VISIBLE</div>
+            <h2>Every closure, open to review.</h2>
+            <p>Inspect a location, change its staffing, and watch the estimates update.</p>
+          </div>
+          <div class="review-filters">
+            <input
+              id="siteSearch"
+              type="search"
+              placeholder="Find a street…"
+              aria-label="Search closure locations"
+            /><select id="siteFilter" aria-label="Filter closure locations">
+              <option value="all">All road classes</option>
+              <option value="major">Arterials only</option>
+              <option value="edited">Edited locations</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Review location</th>
+                <th>Road class</th>
+                <th>Officers</th>
+                <th>Barricades</th>
+                <th>Duty window</th>
+                <th>Burden points</th>
+                <th><span class="sr-only">Edit</span></th>
+              </tr>
+            </thead>
+            <tbody id="sitesTable"></tbody>
+          </table>
+        </div>
+        <div class="table-footer">
+          <span id="tableCount"></span
+          ><button id="showAllSites">Show all locations <span aria-hidden="true">↓</span></button>
+        </div>
+      </section>
+      <footer class="page-footer">
+        <span class="footer-brand">Race Lab <span>/ A civic planning experiment</span></span
+        ><button id="footerSources">Read the model & data notes <span aria-hidden="true">↗</span></button
+        ><span>Built for a conversation with the people who plan race day.</span>
+      </footer>
+    </main>
+    <dialog id="modelDialog" class="model-dialog">
+      <div class="dialog-top">
+        <div>
+          <span class="eyebrow">TRANSPARENT BY DESIGN</span>
+          <h2>The model behind the map.</h2>
+        </div>
+        <button class="icon-close" data-close="modelDialog" aria-label="Close model">×</button>
+      </div>
+      <div class="dialog-content">
+        <div class="notice">
+          <strong>Illustrative assumptions · awaiting local calibration</strong>
+          <p>
+            The numbers below are editable hypotheses, not Richmond Police staffing requirements. Added GIS
+            attributes change the burden index; they do not establish a staffing mandate. Route candidates are
+            exploratory street loops, not approved courses.
+          </p>
+        </div>
+        <h3>01 / Weight the roads</h3>
+        <p class="help-text">
+          At each route junction, the highest road class among the route and side-street approaches sets the
+          default category. Nearby approaches within 22 m sharing a street name are grouped for review.
+        </p>
+        <div class="table-wrap">
+          <table class="rules-table">
+            <thead>
+              <tr>
+                <th>Road class</th>
+                <th>Officers / site</th>
+                <th>Barricades / side approach</th>
+                <th>Burden weight</th>
+              </tr>
+            </thead>
+            <tbody id="rulesTable"></tbody>
+          </table>
+        </div>
+        <h3>02 / Add interpretable data factors</h3>
+        <div class="model-fields">
+          <label
+            >Matched signal · points<input
+              id="settingSignalWeight"
+              type="number"
+              min="0"
+              max="100"
+              step="0.5" /></label
+          ><label
+            >Per 10,000 ADT · points<input
+              id="settingTrafficWeight"
+              type="number"
+              min="0"
+              max="100"
+              step="0.1" /></label
+          ><label
+            >Per 10 mph above 30 · points<input
+              id="settingSpeedWeight"
+              type="number"
+              min="0"
+              max="100"
+              step="0.5" /></label
+          ><label
+            >Extra officers / matched signal<input
+              id="settingSignalOfficers"
+              type="number"
+              min="0"
+              max="20"
+              step="1" /></label
+          ><label
+            >Barricades / alley mouth<input id="settingAlleyBarriers" type="number" min="0" max="20" step="1"
+          /></label>
+        </div>
+        <p class="help-text">
+          These weights are illustrative. A GIS signal or traffic match is evidence for review, not a locally
+          approved staffing rule. ADT is an annual average per day, not race-hour traffic. No match means
+          unknown.
+        </p>
+        <h3>03 / Set the time and cost</h3>
+        <div class="model-fields">
+          <label
+            >Closure approach<select id="settingMode">
+              <option value="full">Full route closure</option>
+              <option value="rolling">Rolling closure estimate</option>
+            </select></label
+          ><label>Race starts<input id="settingStart" type="time" /></label
+          ><label
+            >Fastest pace · min/km<input id="settingFast" type="number" min="2" max="30" step="0.5" /></label
+          ><label
+            >Last-finisher pace · min/km<input
+              id="settingSlow"
+              type="number"
+              min="2"
+              max="30"
+              step="0.5" /></label
+          ><label>Start wave · minutes<input id="settingWave" type="number" min="0" max="240" /></label
+          ><label>Setup lead · minutes<input id="settingSetup" type="number" min="0" max="240" /></label
+          ><label>Clearance tail · minutes<input id="settingClear" type="number" min="0" max="240" /></label
+          ><label>Officer rate · $/hour<input id="settingRate" type="number" min="0" max="1000" /></label
+          ><label
+            >Minimum paid shift · hours<input
+              id="settingMinimumShift"
+              type="number"
+              min="0"
+              max="24"
+              step="0.5" /></label
+          ><label
+            >Centerline to curb · m<input id="settingCurbOffset" type="number" min="0" max="15" step="0.5"
+          /></label>
+        </div>
+        <details class="method-notes" open>
+          <summary>How the numbers are calculated</summary>
+          <p>
+            <strong>Side approaches</strong> are every public road meeting a route junction that the route
+            does not use, including freeway ramps and interchange connections. A junction with a freeway
+            connection defaults to the principal-arterial category. Alley mouths are counted per route; they
+            receive barricades only when you set barricades per alley mouth. Private streets and driveways are
+            not counted.
+          </p>
+          <p>
+            <strong>Burden index</strong> = sum of road-class points + additional-approach points +
+            matched-signal points + ADT points + posted-speed points. Approach points = class weight × 0.2 ×
+            additional side approaches; traffic points = ADT / 10,000 × traffic weight; speed points = max(0,
+            posted mph − 30) / 10 × speed weight. Missing data adds no points and is separately reported as
+            unknown. Scores with different data coverage need review. It is a relative comparison index with
+            no 100-point ceiling. Lower means fewer weighted closure demands under this model. Road weights
+            run 1 to 7 while default officer counts run 1 to 3, so index differences overstate staffing
+            differences; compare officers and cost first.
+          </p>
+          <p>
+            <strong>Distance:</strong> route length is measured on street centerlines. Certified courses are
+            measured on the shortest possible route, 0.30 m from the curb. The shortest-route estimate
+            subtracts 2 × (centerline-to-curb distance − 0.30 m) × tan(turn angle ÷ 2) at each turn, capped at
+            half the shorter adjacent segment. It is an estimate, not a certified measurement.
+          </p>
+          <p>
+            <strong>Officer-hours</strong> = sum of officers at each site × its modeled duty window.
+            <strong>Staffing cost</strong> applies the hourly rate and minimum shift to each site.
+            <strong>Peak officers</strong> is the maximum simultaneous modeled requirement, without
+            redeployment, travel, supervision or relief allowances.
+          </p>
+          <p>
+            <strong>Full closure:</strong> all sites close before the start and reopen after the last finisher
+            plus clearance. <strong>Rolling estimate:</strong> sites close before the first modeled runner
+            arrives and reopen after the last modeled runner passes. Repeat visits share a continuous duty
+            window.
+          </p>
+          <p>
+            <strong>Route character:</strong> turns over 45° and repeated street segments are measured
+            separately. Candidate searches sample 64 loop shapes with street-class penalties and up to four
+            distance refinements, then filter by the brief’s tolerance, required streets and staffing cap.
+            Keep-open streets block connected intersections. They do not establish a global optimum or certify
+            distance. Vehicle one-way restrictions are ignored for these hypothetical fully closed race roads.
+            Freeways, ramps, alleys and private streets are excluded from candidate routing. The fewer-turns
+            preference adds a 150 m equivalent cost per turn over 45° during the search.
+          </p>
+          <p>
+            <strong>Imports:</strong> GPX and GeoJSON tracks are resampled every 20 m and matched to street
+            segments within 50 m using a hidden Markov model that compares street distance with track
+            distance. Route ends are rounded to the nearer intersection. Drawn routes follow the shortest
+            street path between clicks and may retrace a street.
+          </p>
+        </details>
+        <details class="method-notes">
+          <summary>Data sources & what still needs validation</summary>
+          <p>
+            Street centerlines, functional road classes and geometry:
+            <a
+              href="https://services1.arcgis.com/k3vhq11XkBNeeOfM/ArcGIS/rest/services/CarriagewayCenterlines/FeatureServer"
+              target="_blank"
+              rel="noreferrer"
+              >Richmond DPW</a
+            >. Water and park polygons: Richmond GIS. Downloaded November 2, 2026. The bundled study area
+            covers the Fan, downtown and nearby neighborhoods; imports outside the street network are
+            rejected.
+          </p>
+          <p>
+            Planning context:
+            <a href="https://rva.gov/police/permits" target="_blank" rel="noreferrer"
+              >Richmond Police permit guidance</a
+            >
+            and
+            <a
+              href="https://ops.fhwa.dot.gov/publications/fhwaop04010/chapter13.htm"
+              target="_blank"
+              rel="noreferrer"
+              >FHWA street-use event guidance</a
+            >. These sources inform the questions to ask; they do not supply this prototype’s numerical
+            staffing weights.
+          </p>
+          <p>
+            <strong>Added GIS snapshots:</strong>
+            <a
+              href="https://services1.arcgis.com/k3vhq11XkBNeeOfM/ArcGIS/rest/services/Signalized_Intersections/FeatureServer/15"
+              target="_blank"
+              rel="noreferrer"
+              >Richmond signalized intersections</a
+            >;
+            <a
+              href="https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOT_Bidirectional_Traffic_Volume_2025/FeatureServer/0"
+              target="_blank"
+              rel="noreferrer"
+              >VDOT 2025 bidirectional traffic volume</a
+            >;
+            <a
+              href="https://services1.arcgis.com/k3vhq11XkBNeeOfM/arcgis/rest/services/HealthAndSafety1/FeatureServer"
+              target="_blank"
+              rel="noreferrer"
+              >Richmond health and safety facilities</a
+            >. Retrieved November 2, 2026. Only in-service signal records are matched within 35 m; ADT uses
+            aligned geometry within 25 m at two of three segment samples. Spatial joins and facility records
+            need local verification. Co-located facility records are grouped when their street address or
+            fire-station number agrees; the underlying inventories may classify a shared site differently.
+            Data absence is not evidence of zero traffic or no signal.
+          </p>
+          <p>
+            <strong>Access screening:</strong> compares undirected public-road connectivity before and after
+            simultaneous closure of the selected segments and nearby parallel same-name carriageways. It
+            ignores one-way and turn restrictions, external roads outside the snapshot, capacity, live traffic
+            and actual emergency access arrangements. Detours are distance-only probes. A connected result is
+            not an access approval; a separated result may reflect study-boundary or GIS errors.
+          </p>
+          <p>
+            <strong>Calibration:</strong> actual observations stay in this browser and session exports. Errors
+            are calculated only for matched rows with the relevant observed value. No statistical confidence
+            or validated staffing accuracy is claimed before real observations are supplied.
+          </p>
+          <p>
+            Before operational use: verify the network and junction grouping, road width, driveway access,
+            course suitability, barricade design, transit, detours, hospitals, emergency access, construction,
+            race-day timing and the traffic-control authority’s staffing rules. No reduction in staffing is
+            validated here.
+          </p>
+        </details>
+        <p class="local-note">
+          Sessions save in this browser. Download a full session to keep a copy or open it elsewhere.
+        </p>
+        <div class="form-error" id="modelError" role="alert"></div>
+      </div>
+      <div class="dialog-footer">
+        <button class="button outline" id="resetModel">Reset model defaults</button
+        ><button class="button primary" id="saveModel">
+          Apply assumptions <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    </dialog>
+    <dialog id="siteDialog" class="site-dialog">
+      <div class="dialog-top">
+        <div>
+          <span class="eyebrow">LOCATION REVIEW</span>
+          <h2 id="siteDialogTitle">Review this junction</h2>
+        </div>
+        <button class="icon-close" data-close="siteDialog" aria-label="Close location">×</button>
+      </div>
+      <div class="dialog-content">
+        <div id="siteSummary"></div>
+        <div class="model-fields">
+          <label>Review category<select id="siteClass"></select></label
+          ><label>Officers at this site<input id="siteOfficers" type="number" min="0" max="100" /></label
+          ><label>Total barricades<input id="siteBarriers" type="number" min="0" max="100" /></label>
+        </div>
+        <label class="note-label"
+          >Override reason (required)<textarea
+            id="siteNote"
+            placeholder="What does the local team know about this location?"
+            rows="3"
+            maxlength="500"
+          ></textarea>
+        </label>
+        <p class="help-text">
+          This edit applies to the selected route. An override is a planning assumption, not an approved
+          staffing decision.
+        </p>
+        <div id="siteError" class="form-error" role="alert"></div>
+      </div>
+      <div class="dialog-footer">
+        <button class="button outline" id="resetSite">Use model defaults</button
+        ><button class="button primary" id="saveSite">Save location <span aria-hidden="true">→</span></button>
+      </div>
+    </dialog>
+    <input type="file" id="actualsInput" accept=".csv,text/csv" hidden /><input
+      type="file"
+      id="fileInput"
+      accept=".gpx,.geojson,.json,application/json,application/gpx+xml"
+      hidden
+    />
+    <div class="toast" id="toast" role="status" hidden></div>
+    <script src="data.js"></script>
+    <script src="model.js"></script>
+    <script src="planning.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

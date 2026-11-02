@@ -29,10 +29,11 @@
       >
       <nav aria-label="Workspace">
         <button class="nav-active" id="planNav">Route workspace</button
-        ><button id="modelNav">Model & sources <span aria-hidden="true">↗</span></button>
+        ><button id="modelNav">Model & sources <span aria-hidden="true">↗</span></button
+        ><button id="builtNav">How it was built</button>
       </nav>
       <div class="header-actions">
-        <span class="prototype"><span></span> Research update · v4</span>
+        <span class="prototype"><span></span> Research update · v4.1</span>
         <div class="export-wrap">
           <button class="button outline" id="exportButton">Export <span aria-hidden="true">↗</span></button>
           <div class="export-menu" id="exportMenu" hidden>
@@ -361,9 +362,341 @@
           ><button id="showAllSites">Show all locations <span aria-hidden="true">↓</span></button>
         </div>
       </section>
+      <section class="built-section" id="howBuilt" aria-labelledby="howBuiltTitle">
+        <div class="analysis-header">
+          <div>
+            <div class="eyebrow">METHOD / DATA / DESIGN</div>
+            <h2 id="howBuiltTitle">How this was built.</h2>
+          </div>
+          <span class="revision-badge" id="builtVersion">Model v4</span>
+        </div>
+        <p class="built-lead">
+          Race Lab turns a race brief into candidate courses. For each one it estimates which streets close,
+          where officers and barricades go, what staffing costs and who loses road access. It runs entirely in
+          your browser on a snapshot of public Richmond data. Every number traces to a dataset, a published
+          rule or an assumption you can edit.
+        </p>
+        <div class="built-stats" id="builtStats"></div>
+        <div class="built-grid">
+          <article class="built-card">
+            <h3>The question it answers</h3>
+            <p>
+              Given a start, a distance and any streets to require or keep open: which streets close, where do
+              posts go, what does staffing cost, and who loses access?
+            </p>
+            <p>
+              It is built for the conversation between race organizers, Richmond Police, Public Works and
+              Parks. It informs decisions; it does not approve anything.
+            </p>
+          </article>
+          <article class="built-card built-card-wide">
+            <h3>The data</h3>
+            <table class="built-table">
+              <thead>
+                <tr>
+                  <th>Layer</th>
+                  <th>Source</th>
+                  <th>Used for</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Streets</td>
+                  <td>Richmond DPW Carriageway Centerlines</td>
+                  <td>Routing, road class, posted speed, one-way rules, street type</td>
+                </tr>
+                <tr>
+                  <td>Signals</td>
+                  <td>Richmond Signalized Intersections</td>
+                  <td>In-service signals within 35 m of a post</td>
+                </tr>
+                <tr>
+                  <td>Traffic</td>
+                  <td>VDOT 2025 bidirectional volumes</td>
+                  <td>Annual average daily traffic, matched to streets by aligned geometry</td>
+                </tr>
+                <tr>
+                  <td>Facilities</td>
+                  <td>Richmond Health and Safety layers</td>
+                  <td>Hospitals, EMS, fire and police for the access screen</td>
+                </tr>
+                <tr>
+                  <td>Map</td>
+                  <td>Richmond GIS parks and water</td>
+                  <td>Background only</td>
+                </tr>
+              </tbody>
+            </table>
+            <p>
+              Python scripts download each layer, join street segments whose ends lie within 1.2 m into one
+              network, keep the largest connected piece, and attach signals, traffic and facilities. A missing
+              match means unknown, not zero. The dataset ID is a hash of the street network, so saved work and
+              worksheets cannot attach to a different snapshot.
+            </p>
+            <p class="built-meta" id="builtDataset"></p>
+          </article>
+          <article class="built-card">
+            <h3>From brief to course</h3>
+            <ul>
+              <li>
+                The search tries 64 loop shapes around the start and joins their corners along streets with an
+                A* shortest-path search.
+              </li>
+              <li>It rescales each loop up to four times toward the target distance.</li>
+              <li>
+                It keeps loops within the tolerance that visit required streets and avoid keep-open streets,
+                then offers three: balanced, lower burden and fewer turns.
+              </li>
+              <li>
+                "Favor fewer turns" adds a 150 m cost per turn during the search. "Favor smaller streets"
+                raises the cost of arterials.
+              </li>
+              <li>It answers in under a second. It is a search heuristic, not a proof of the best course.</li>
+            </ul>
+          </article>
+          <article class="built-card">
+            <h3>Closures and posts</h3>
+            <ul>
+              <li>
+                A post is any course junction where a public road the course does not use meets it, including
+                freeway ramps.
+              </li>
+              <li>Junctions within 22 m that share a street name merge into one post.</li>
+              <li>
+                The busiest road at a post sets its category. Freeway connections default to principal
+                arterial.
+              </li>
+              <li>Alley mouths are counted. They get barricades only if you set a number.</li>
+            </ul>
+          </article>
+          <article class="built-card">
+            <h3>Staffing and cost</h3>
+            <ul>
+              <li>
+                Officers per post by road class: 1, 1, 2 and 3, from local street to principal arterial. These
+                are placeholders until real staffing data calibrates them.
+              </li>
+              <li>
+                Each post is staffed from setup until the last finisher, start wave and clearance pass.
+                Rolling closures use each post's own runner arrival times.
+              </li>
+              <li>
+                Billing follows Richmond PD's agreements: at least 4 hours per officer, and a started hour
+                bills in full past 15 minutes. Ten or more officers fall under form PD-119SPE, requested 30
+                days ahead.
+              </li>
+              <li>Cost = billed officer-hours × rate. The $85 rate is a placeholder.</li>
+              <li>
+                Moving officers between posts is not modeled: in a 5K or 10K, no post closes before another
+                opens.
+              </li>
+            </ul>
+          </article>
+          <article class="built-card">
+            <h3>Distance</h3>
+            <ul>
+              <li>Length is measured along street centerlines.</li>
+              <li>
+                Certified courses use the shortest possible route, 0.30 m from the curb, which cuts every
+                corner.
+              </li>
+              <li>
+                The estimate subtracts 2 × (centerline-to-curb distance − 0.30 m) × tan(turn angle ÷ 2) at
+                each turn. For the default Fan 5K the estimate is 134 m (2.7%) shorter than the centerline.
+              </li>
+              <li>Only a certified measurement settles the distance.</li>
+            </ul>
+          </article>
+          <article class="built-card">
+            <h3>Access and emergency response</h3>
+            <ul>
+              <li>The screen closes the whole course at once and finds areas that lose road access.</li>
+              <li>
+                It repeats the check with one-way rules to find blocks drivers can enter but not leave, or
+                leave but not enter.
+              </li>
+              <li>
+                It times fire and EMS travel from every mapped station before and after closure and flags
+                increases over 2 minutes.
+              </li>
+              <li>
+                It assumes emergency vehicles cannot cross the course. Real plans agree crossing points with
+                RPD and Richmond Fire.
+              </li>
+            </ul>
+          </article>
+          <article class="built-card">
+            <h3>Imports and drawing</h3>
+            <ul>
+              <li>
+                GPX and GeoJSON tracks are matched to streets with a hidden Markov model, the standard
+                map-matching method (Newson and Krumm, 2009).
+              </li>
+              <li>
+                In testing, the app's own exports re-imported identically for 51 of 51 routes. Simulated watch
+                tracks landed within 2% of true length for 50 of 51.
+              </li>
+              <li>
+                Drawn routes follow the shortest street path between clicks and may double back on a street.
+              </li>
+            </ul>
+          </article>
+          <article class="built-card">
+            <h3>Design choices</h3>
+            <ul>
+              <li>
+                Static and private: no server, accounts or tracking. Sessions stay in this browser. A share
+                link carries the scenario after the #, which browsers do not send to servers.
+              </li>
+              <li>No third-party code runs in the page. The map is drawn directly from the street data.</li>
+              <li>
+                Officers and cost lead. The burden index comes last because it is a weighting, not a staffing
+                number.
+              </li>
+              <li>
+                Only the brief is required. Detail sits behind "How these numbers are calculated" and the
+                model notes.
+              </li>
+            </ul>
+          </article>
+          <article class="built-card">
+            <h3>How it is tested</h3>
+            <ul>
+              <li>
+                Three test suites check the model, the planning tools and every defect fixed since version 2.
+              </li>
+              <li>
+                Eighteen browser tests drive the app in Chromium, from route search to share links, at desktop
+                and phone widths.
+              </li>
+              <li>
+                Richmond PD rules were checked against forms PD-119SPE (revised 06/09/2025) and PD-119SE
+                (revised 07/14/2025).
+              </li>
+              <li>
+                Staffing accuracy stays unmeasured until a real event's numbers are entered in the worksheet.
+              </li>
+            </ul>
+          </article>
+          <article class="built-card">
+            <h3>What it does not know yet</h3>
+            <ul>
+              <li>Real staffing and invoices from past Richmond races.</li>
+              <li>Turn restrictions, lane widths, race-morning traffic and transit routes.</li>
+              <li>Elevation, emergency crossing points and detour signing.</li>
+              <li>Any permit decision. Those belong to RPD, Public Works and Parks.</li>
+            </ul>
+          </article>
+          <article class="built-card built-card-full">
+            <h3>Build history</h3>
+            <ol class="built-history">
+              <li><strong>v2</strong> Prototype generated with ChatGPT from the public data above.</li>
+              <li>
+                <strong>v3</strong> Independent review and fixes with Claude: ramps counted, imports matched
+                to streets, saved work protected, tests added.
+              </li>
+              <li>
+                <strong>v4</strong> Research-informed upgrades graded for fit: Richmond PD billing, explained
+                numbers, share links, closure packet, one-way and fire/EMS screening.
+              </li>
+              <li>Hosted as static files on Lovable.</li>
+            </ol>
+          </article>
+        </div>
+        <details class="built-sources">
+          <summary>Sources</summary>
+          <ul>
+            <li>
+              <a
+                href="https://services1.arcgis.com/k3vhq11XkBNeeOfM/ArcGIS/rest/services/CarriagewayCenterlines/FeatureServer"
+                target="_blank"
+                rel="noreferrer"
+                >Richmond DPW Carriageway Centerlines</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://services1.arcgis.com/k3vhq11XkBNeeOfM/ArcGIS/rest/services/Signalized_Intersections/FeatureServer/15"
+                target="_blank"
+                rel="noreferrer"
+                >Richmond Signalized Intersections</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://services.arcgis.com/p5v98VHDX9Atv3l7/arcgis/rest/services/VDOT_Bidirectional_Traffic_Volume_2025/FeatureServer/0"
+                target="_blank"
+                rel="noreferrer"
+                >VDOT 2025 Bidirectional Traffic Volume</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://services1.arcgis.com/k3vhq11XkBNeeOfM/arcgis/rest/services/HealthAndSafety1/FeatureServer"
+                target="_blank"
+                rel="noreferrer"
+                >Richmond Health and Safety facilities</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://www.rva.gov/sites/default/files/2026-02/PD-119-SPE%20%28Employer%20Agreement%20for%20Special%20Events%29.pdf"
+                target="_blank"
+                rel="noreferrer"
+                >Richmond PD form PD-119SPE: Employer Agreement for Special Events</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://www.rva.gov/sites/default/files/2026-02/PD-119-SE%20%28Employer%20Agreement%20for%20Single%20Event%29.pdf"
+                target="_blank"
+                rel="noreferrer"
+                >Richmond PD form PD-119SE: Employer Agreement for Single Event</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://www.rva.gov/sites/default/files/2021-08/Street%20Closing%20Permit%20Application%20plus%20Guide%202021.pdf"
+                target="_blank"
+                rel="noreferrer"
+                >Richmond Street Closing Permit Application and Guide</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://ops.fhwa.dot.gov/publications/fhwaop04010/chapter13.htm"
+                target="_blank"
+                rel="noreferrer"
+                >FHWA, Managing Travel for Planned Special Events, chapter 13</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://mutcd.fhwa.dot.gov/pdfs/11th_Edition/part6.pdf"
+                target="_blank"
+                rel="noreferrer"
+                >MUTCD 11th Edition, Part 6: Temporary Traffic Control</a
+              >
+            </li>
+            <li>
+              <a
+                href="https://rrtc.net/procedures_manual/PDF_version/2022/RRTC_Procedures_Manual_Version-2022-1-1.pdf"
+                target="_blank"
+                rel="noreferrer"
+                >USATF Road Running Technical Council course measurement procedures</a
+              >
+            </li>
+            <li>
+              Newson, P. and Krumm, J. (2009). Hidden Markov Map Matching Through Noise and Sparseness. ACM
+              SIGSPATIAL.
+            </li>
+          </ul>
+        </details>
+      </section>
       <footer class="page-footer">
         <span class="footer-brand">Race Lab <span>/ A civic planning experiment</span></span
         ><button id="footerSources">Read the model & data notes <span aria-hidden="true">↗</span></button
+        ><button id="footerBuilt">How this was built <span aria-hidden="true">↓</span></button
         ><span>Built for a conversation with the people who plan race day.</span>
       </footer>
     </main>

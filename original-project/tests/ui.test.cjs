@@ -370,6 +370,36 @@ async function step(name, fn) {
     assert.equal(await page.locator('#packet svg circle').count(), rows);
   });
 
+  await step('"How this was built" explains data and method with live counts', async () => {
+    await page.click('#builtNav');
+    await page
+      .waitForFunction(
+        () => Math.abs(document.getElementById('howBuilt').getBoundingClientRect().top) < 200,
+        null,
+        {
+          timeout: 5000,
+        }
+      )
+      .catch(() => {
+        throw new Error('The nav link did not scroll to the section');
+      });
+    const stats = await page.locator('#builtStats').innerText();
+    const routable = await page.evaluate(() => window.RACE_DATA.edges.filter((e) => e.c >= 0).length);
+    assert.ok(stats.includes(routable.toLocaleString('en-US')), 'Counts come from the bundled data');
+    const text = await page.locator('#howBuilt').innerText();
+    for (const phrase of [
+      'The data',
+      'From brief to course',
+      'Staffing and cost',
+      'Distance',
+      'Design choices',
+      'Build history',
+      'PD-119SPE',
+    ])
+      assert.ok(text.includes(phrase), phrase);
+    assert.ok((await page.locator('#howBuilt .built-sources a').count()) >= 10, 'Sources are linked');
+  });
+
   await step('page does not scroll sideways at phone width', async () => {
     const phone = await browser.newContext({
       viewport: { width: 390, height: 844 },

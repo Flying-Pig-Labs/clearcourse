@@ -1885,6 +1885,27 @@
   });
   for (const id of ['modelNav', 'assumptionsButton', 'footerSources'])
     $(id).addEventListener('click', openModel);
+  // Live counts for "How this was built", so the section stays true if the data snapshot changes.
+  function renderBuilt() {
+    const routable = D.edges.filter((e) => e.c >= 0),
+      enrichment = D.enrichment || {};
+    const stats = [
+      [routable.length, 'routable street segments'],
+      [routable.filter((e) => e.oneWay === 'FT' || e.oneWay === 'TF').length, 'one-way segments'],
+      [(D.signals || []).length, 'signals in service'],
+      [enrichment.traffic?.matchedEdges ?? 0, 'segments with 2025 traffic counts'],
+      [(D.facilities || []).length, 'hospital, EMS, fire and police locations'],
+    ];
+    $('builtStats').innerHTML = stats
+      .map(([value, label]) => `<div class="built-stat"><strong>${n(value)}</strong>${escape(label)}</div>`)
+      .join('');
+    $('builtDataset').textContent =
+      `Snapshot retrieved ${D.source?.retrieved || 'unknown'} · dataset ${DATASET} · ${n(D.nodes.length)} network points · ${n(D.parks.length)} park and ${n(D.water.length)} water polygons.`;
+    $('builtVersion').textContent = `Model v${M.VERSION} · data ${D.source?.retrieved || ''}`;
+  }
+  const showBuilt = () => $('howBuilt').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('builtNav').addEventListener('click', showBuilt);
+  $('footerBuilt').addEventListener('click', showBuilt);
   $('planNav').addEventListener('click', () =>
     document.querySelector('.brief').scrollIntoView({ behavior: 'smooth', block: 'start' })
   );
@@ -2083,6 +2104,7 @@
     ready: false,
   };
   renderBase();
+  renderBuilt();
   syncControls();
   applyView();
   (async () => {

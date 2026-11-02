@@ -172,10 +172,10 @@ npm test                 # model, planning and regression suites
 npm run lint             # ESLint, recommended rules
 npm run format:check     # Prettier
 npm i -D playwright && npx playwright install chromium
-npm run test:ui          # 17 browser tests
+npm run test:ui          # 18 browser tests
 ```
 
-`tests/regression.test.cjs` and `tests/ui.test.cjs` guard each defect fixed in version 3 and each feature added in version 4. All 17 browser tests pass on version 4.
+`tests/regression.test.cjs` and `tests/ui.test.cjs` guard each defect fixed in version 3 and each feature added in version 4. All 18 browser tests pass on version 4.1.
 
 `.openai/hosting.json` is the configuration for the existing ChatGPT Sites deployment. Other hosts ignore it.
 
@@ -184,6 +184,10 @@ npm run test:ui          # 17 browser tests
 Use one past race and its real closure/staffing plan. Import its GPX, review detected junctions, replace default weights and staffing counts, assess route suitability, width, transit, construction, emergency and residential access, and compare predicted resources with the actual deployment. No staffing reduction is established by this prototype.
 
 Remaining production work includes operational staffing data, local validation, lane/width and turning-movement data, directional/capacity-aware access analysis, formally governed GIS refreshes, durable shared records, full immutable audit/version histories, and a constrained solver if the validated pilot warrants it. Type checking (for example JSDoc with `tsc --checkJs`) is not set up.
+
+## Version 4.1
+
+Adds a "How this was built" section (header link and footer link) that explains the question the app answers, the data, route search, posts, staffing and billing, distance, access screening, imports, design choices, testing, known gaps, build history and sources. Its data counts are read from the bundled snapshot at load, so they stay correct if the data is rebuilt.
 
 ## Version 4 changes
 

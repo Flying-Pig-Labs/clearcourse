@@ -1,5 +1,6 @@
 {
   "project": "Richmond Race Lab",
+  "app_version": "4.1.0",
   "model_version": "4.0",
   "dataset_version": "richmond-centerlines-2026-11-02-64e8dbb27033",
   "exported": "2026-11-02",
@@ -17,16 +18,16 @@
       "sha256": "5bb29b7a52c64de79e687e76e814f5647587d000211ef51954a12cacf1805fdc"
     },
     "README.md": {
-      "bytes": 23601,
-      "sha256": "ac408ad3afbbd197886801988d36bea62d4a976874339c01aec87365e217cca0"
+      "bytes": 23989,
+      "sha256": "5b9a09697eab5baef7490e468277ca8b705dbd3a03679ab68f999347d0a62494"
     },
     "START_HERE.md": {
       "bytes": 1763,
-      "sha256": "7119f60cebcfceff02b691bdd2de65534b933fea8ac8d07a2eebe25ff1ff03c6"
+      "sha256": "b8d902ca57c0f1c8e33a28513c4b9a29638ef4987f26fd22c0907ba5eeb01d59"
     },
     "dist/app.js": {
-      "bytes": 90066,
-      "sha256": "1f79f957d92eb671fe61be73cd312dadbae1e173ba77e7c9bdfa42b9fa9b77a7"
+      "bytes": 91404,
+      "sha256": "db33d3c37320929c1ac160f88f9cd89a0021f4067200202c7fd050dd57b460c9"
     },
     "dist/data.js": {
       "bytes": 4626101,
@@ -37,8 +38,8 @@
       "sha256": "c0b4b64ec4e9a282a74ea31caddac59e70fae2c97278173a4e3f093c8ac82325"
     },
     "dist/index.html": {
-      "bytes": 33904,
-      "sha256": "1aab9bedd19101e6aab733bce73c44ae2dff5d444f2551448f7ac0aff2cf2c91"
+      "bytes": 48835,
+      "sha256": "48f75a39790437b52a5ed52a980d5e7389e8b115f80de0a8ae4f73748114a776"
     },
     "dist/model.js": {
       "bytes": 40783,
@@ -49,8 +50,8 @@
       "sha256": "6e842203050ed1ef04d62f9b9c85b7cffef287d435f4633875e9ada85551bd29"
     },
     "dist/style.css": {
-      "bytes": 43353,
-      "sha256": "20ca5d84cb05bc153c45868b34e1f3a141091596b4df790dbe3912656e595619"
+      "bytes": 46371,
+      "sha256": "742f54744243124775f353d15297cbda1e60c9605cb7f188113d0ba83b2f375b"
     },
     "docs/roadmap-rubric.md": {
       "bytes": 7525,
@@ -66,7 +67,7 @@
     },
     "package.json": {
       "bytes": 977,
-      "sha256": "ad21ce1c3040538a1f63cbca65abc3356d66cb149774a24bf49936d9e8c8089e"
+      "sha256": "0eebcda3bfc1ee158690d7d578b086c0248414fbe59029cd1fb45075f990e81d"
     },
     "tests/model.test.cjs": {
       "bytes": 4523,
@@ -81,8 +82,8 @@
       "sha256": "4c540cf53c9f12c75d1caec14cf2a3544fa677b112dc663d07cb5a81717fb10c"
     },
     "tests/ui.test.cjs": {
-      "bytes": 16892,
-      "sha256": "a7130aca3c22919f97a564e1e5fe627dc4ba438e17e7c26f295b9ca2ea665480"
+      "bytes": 18006,
+      "sha256": "0c74db9e14a9331ae2e68ee7a6af30f670c6089a96e1e58fc292c2b83481074e"
     },
     "tools/build_data.py": {
       "bytes": 3315,

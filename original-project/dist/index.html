@@ -10,23 +10,15 @@
     />
     <title>ClearCourse · Route planning prototype</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="favicon.ico" sizes="any" />
+    <link rel="apple-touch-icon" href="/__l5e/assets-v1/ba9f443b-e28c-4a1c-bb5f-d8e2c3e9b799/apple-touch-icon.png" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="clearcourse/brand.css" />
   </head>
   <body>
     <header class="topbar">
       <a class="brand" href="./" aria-label="ClearCourse home"
-        ><span class="brand-symbol"
-          ><svg viewBox="0 0 28 28" fill="none" aria-hidden="true">
-            <path
-              d="M7 21V10a4 4 0 0 1 8 0v8a3 3 0 0 0 6 0V7"
-              stroke="currentColor"
-              stroke-width="2.7"
-              stroke-linecap="round"
-            />
-            <circle cx="7" cy="22" r="3" fill="currentColor" />
-            <circle cx="21" cy="6" r="3" stroke="currentColor" stroke-width="2" /></svg></span
-        ><span>ClearCourse<span class="brand-sub">RICHMOND, VIRGINIA</span></span></a
-      >
+        ><span class="brand-lockup"><img class="brand-logo" src="/__l5e/assets-v1/304d10b8-c0a7-42bb-aa8a-edec362bae0a/logo-horizontal.svg" alt="ClearCourse" width="460" height="72" /><span class="brand-sub">RICHMOND, VIRGINIA</span></span></a>
       <nav aria-label="Workspace">
         <button class="nav-active" id="planNav">Route workspace</button
         ><button id="modelNav">Model & sources <span aria-hidden="true">↗</span></button
@@ -376,6 +368,10 @@
           your browser on a snapshot of public Richmond data. Every number traces to a dataset, a published
           rule or an assumption you can edit.
         </p>
+        <picture class="brand-process">
+          <source media="(min-width: 900px)" srcset="/__l5e/assets-v1/8936b821-a100-461f-bee2-83862b9e34f9/how-it-works-desktop.svg" />
+          <img src="/__l5e/assets-v1/08b42199-0e44-4338-bea9-1a36fcd6a4d6/how-it-works-mobile.svg" loading="lazy" alt="Sketch a course: draw or import a route. Review the closures: inspect crossings and staffing assumptions. Compare the options: balance distance, staff time and estimated cost." />
+        </picture>
         <div class="built-stats" id="builtStats"></div>
         <div class="built-grid">
           <article class="built-card">

@@ -1,0 +1,14 @@
+.brand-lockup { display: block; min-width: 0; }
+.brand-logo { display: block; width: clamp(180px, 28vw, 250px); height: auto; }
+.brand-lockup .brand-sub { margin-top: 6px; margin-left: 48px; letter-spacing: 0; color: var(--muted); }
+.brand-process { display: block; width: 100%; margin: 24px 0; }
+.brand-process img { display: block; width: 100%; height: auto; }
+@media (max-width: 740px) {
+  .brand-logo { width: 180px; }
+  .brand-lockup .brand-sub { margin-left: 35px; }
+  .brand-process { max-width: 480px; margin: 20px auto; }
+}
+@media (max-width: 360px) {
+  .brief-controls { grid-template-columns: minmax(0, 1fr); }
+  .field.custom-distance { grid-column: auto; }
+}

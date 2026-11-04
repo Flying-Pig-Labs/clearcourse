@@ -1002,6 +1002,14 @@ tbody tr:last-child td {
   font-size: 9px;
   color: #778d62;
 }
+.page-footer a.footer-github {
+  font-size: 9px;
+  color: #778d62;
+  text-decoration: none;
+}
+.page-footer a.footer-github:hover {
+  text-decoration: underline;
+}
 .page-footer > span:last-child {
   font-size: 8px;
 }
@@ -1642,7 +1650,8 @@ textarea {
     margin-top: 20px;
     padding: 20px 0;
   }
-  .page-footer button {
+  .page-footer button,
+  .page-footer a.footer-github {
     display: block;
     padding: 10px 0 0;
     font-size: 10px;
@@ -1718,6 +1727,7 @@ textarea {
   .review-filters,
   .assumptions-link,
   .page-footer button,
+  .page-footer a.footer-github,
   .draw-banner,
   .table-footer button {
     display: none !important;

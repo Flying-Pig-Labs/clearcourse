@@ -78,7 +78,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Richmond Race Lab" },
+      { title: "ClearCourse" },
+      { property: "og:site_name", content: "ClearCourse" },
       { name: "description", content: "Plan Richmond race routes and estimate closure staffing from bundled GIS data." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

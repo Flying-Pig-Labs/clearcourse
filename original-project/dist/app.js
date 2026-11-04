@@ -1693,7 +1693,7 @@
     };
   }
   function sessionFromShare(x) {
-    if (!x || x.v !== 2 || !Array.isArray(x.routes)) throw new Error('This link is not a Race Lab scenario.');
+    if (!x || x.v !== 2 || !Array.isArray(x.routes)) throw new Error('This link is not a ClearCourse scenario.');
     if (x.d !== DATASET)
       throw new Error(
         `It was made with street snapshot ${String(x.d).slice(0, 60)}; this app uses ${DATASET}.`

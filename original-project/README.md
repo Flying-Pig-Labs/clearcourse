@@ -119,12 +119,23 @@ A track more than 50 m from any routable street for more than 200 m is rejected 
 3. Keeps replacements within 800 m of the length they replace, drops any that would run on a street the kept course uses, and scores each full course with the same staffing model.
 4. Offers up to three distinct options (at most 60% of their new streets shared):
    - **Closest-distance:** smallest length change.
-   - **Lowest-cost:** lowest estimated staffing cost.
+   - **Fewest-closures:** fewest closure points, meaning junctions where a side street meets the course. This is the proxy for residents affected.
    - **Smallest-change:** shortest stretch changed.
 
-   Each ranking adds a large penalty for every point where the replacement crosses the rest of the course.
+   Each ranking adds a large penalty for every point where the replacement crosses the rest of the course. Police cost does not choose an option. The organizer reports that marathon officer numbers are set by security and mutual aid, not by the route. Cost is still shown on every option.
 
-The original course stays first in the comparison, so each reroute's card and note show officers, cost and distance against it. A length change has to be made up elsewhere, and the course re-measured. The search does not do either.
+5. Reports where each replacement leaves and rejoins the course. A replacement that follows the course before turning off is trimmed, so that point is where the route actually changes.
+
+The original course stays first in the comparison, so each reroute's card and note show closure points, officers, cost and distance against it. A length change has to be made up elsewhere, and the course re-measured. The search does not do either.
+
+**What it does not know.** These are the constraints that decide a marathon reroute. Sports Backers has not stated them yet:
+
+- exact certified distance;
+- elevation and the downhill finish;
+- water stops, timing mats and mile markers;
+- crowd and spectator zones;
+- how often the same residents are closed in by other events;
+- the part of the course in Henrico.
 
 **Bundled example: 2026 marathon, mile 20 to the finish.**
 
@@ -137,12 +148,12 @@ The original course stays first in the comparison, so each reroute's card and no
 
 **Results on that section** (default model):
 
-| Course                                                                                                                                                                   | Length change | Officers | Est. cost |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- | -------- | --------- |
-| Current course (uses the bridge)                                                                                                                                         | —             | 130      | $48,280   |
-| Closest-distance reroute (leaves at the Admiral St circle, mile 24.24; School Rd, Admiral St, Brook Rd, Chamberlayne Pkwy, N Adams St; rejoins W Grace St at mile 25.95) | +3 m          | 144      | $53,320   |
-| Lowest-cost reroute (as above to Chamberlayne Pkwy, then W Jackson St, St James St, E Clay St, N 1st St)                                                                 | +45 m         | 142      | $52,600   |
-| Smallest-change reroute (stays on Brook Rd at mile 23.98; Mitchell St, N Belvidere St, W Broad St, N Pine St; rejoins at mile 25.34)                                     | −21 m         | 154      | $56,920   |
+| Course                                                                                                                                                        | Length change | Closure points | Officers | Est. cost |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | -------------- | -------- | --------- |
+| Current course (uses the bridge)                                                                                                                              | —             | 68             | 130      | $48,280   |
+| Closest-distance reroute (leaves at the Admiral St circle, mile 24.24; School Rd, Admiral St, Brook Rd, Chamberlayne Pkwy, N Adams St; rejoins at mile 25.70) | +3 m          | 75             | 144      | $53,320   |
+| Fewest-closures reroute (stays on Brook Rd at mile 23.98; Mitchell St, N Belvidere St; rejoins at mile 25.40)                                                 | −203 m        | 71             | 150      | $55,480   |
+| Smallest-change reroute (leaves at the Admiral St circle; School Rd, Brook Rd, Belvidere St, Leigh St, Broad St; rejoins at mile 25.40)                       | +198 m        | 75             | 150      | $55,480   |
 
 These are search outputs, not proposals. The closest-distance option threads several small residential streets. None of the three crosses the rest of the course. Every option adds officers, because each one runs through more junctions than the bridge does. These are model estimates, and the posts and junctions still need review by RPD and Sports Backers.
 
@@ -235,6 +246,10 @@ npm run test:ui          # 20 browser tests
 Use one past race and its real closure/staffing plan. Import its GPX, review detected junctions, replace default weights and staffing counts, assess route suitability, width, transit, construction, emergency and residential access, and compare predicted resources with the actual deployment. No staffing reduction is established by this prototype.
 
 Remaining production work includes operational staffing data, local validation, lane/width and turning-movement data, directional/capacity-aware access analysis, formally governed GIS refreshes, durable shared records, full immutable audit/version histories, and a constrained solver if the validated pilot warrants it. Type checking (for example JSDoc with `tsc --checkJs`) is not set up.
+
+## Version 4.4
+
+The second reroute option is now ranked by fewest closure points, not staffing cost. Reported leave and rejoin points trim any stretch a replacement shares with the course. Before this fix, one option was reported as leaving at mile 23.31 when it actually left at mile 23.98. Model version 4.4.
 
 ## Version 4.3
 

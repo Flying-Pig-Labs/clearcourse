@@ -204,6 +204,16 @@ const real = M.createNetwork(sandbox.window.RACE_DATA);
       'Course after is kept'
     );
     assert.ok(Math.abs(c.length - at.at(-1) - c.change.delta) < 0.01, 'Length change is reported exactly');
+    assert.notEqual(
+      c.change.addedEdges[0],
+      fixed.edges[detach.index],
+      'Leave point is where the course changes'
+    );
+    assert.notEqual(
+      c.change.addedEdges.at(-1),
+      fixed.edges[rejoin.index - 1],
+      'Rejoin point is where it changes'
+    );
     assert.ok(Math.abs(c.change.delta) <= M.REROUTE.tolerance, 'Within the length tolerance');
     // The replacement never reuses a street the kept course runs on.
     const kept = new Set([...fixed.edges.slice(0, detach.index), ...fixed.edges.slice(rejoin.index)]);
@@ -227,6 +237,7 @@ const real = M.createNetwork(sandbox.window.RACE_DATA);
       officers: c.score.officers,
       baseline: rr.baseline.officers,
       crossings: c.change.crossings,
+      closurePoints: c.score.sites.length,
     })),
     rerouteMs + 'ms'
   );

@@ -1194,16 +1194,31 @@
             nodes.push(v);
           }
           if (!ok || !edges.length) continue;
-          // The search left the course after the closure open; a replacement for this rejoin point must
-          // still not run on any street the course keeps.
-          if (edges.some((e) => (positions.get(e) || []).some((k) => k < i || k >= j))) continue;
           nodes.reverse();
           edges.reverse();
+          // A replacement that first follows the course leaves it later; one that ends on the course rejoins
+          // earlier. Trim those shared stretches so the reported leave and rejoin points are where it changes.
+          let a = i,
+            b = j;
+          while (edges.length && edges[0] === route.edges[a]) {
+            edges.shift();
+            nodes.shift();
+            a++;
+          }
+          while (edges.length && edges[edges.length - 1] === route.edges[b - 1]) {
+            edges.pop();
+            nodes.pop();
+            b--;
+          }
+          if (!edges.length || a > first || b < last + 1) continue;
+          // The search left the course after the closure open; a replacement must still not run on any street
+          // the course keeps.
+          if (edges.some((e) => (positions.get(e) || []).some((k) => k < a || k >= b))) continue;
           const added = edges.reduce((s, e) => s + D.edges[e].l, 0),
-            removed = at[j] - at[i],
+            removed = at[b] - at[a],
             delta = added - removed;
           if (Math.abs(delta) > o.tolerance) continue;
-          found.push({ i, j, penalty, nodes, edges, added, removed, delta });
+          found.push({ i: a, j: b, penalty, nodes, edges, added, removed, delta });
         }
       }
     // Several (detach, rejoin, penalty) combinations give the same replacement; keep one of each.
@@ -1250,10 +1265,13 @@
         .find((c) => !chosen.includes(c) && distinct(c, chosen));
       if (pick) chosen.push({ ...pick, name, id: routeId(pick.edges) });
     };
-    // Crossing the course is a safety cost, so every ranking charges for it.
-    const crossing = (c) => c.change.crossings * 1000;
-    take((c) => Math.abs(c.change.delta) + crossing(c) + c.score.officers, 'Closest-distance reroute');
-    take((c) => c.score.cost + Math.abs(c.change.delta) * 2 + crossing(c) * 20, 'Lowest-cost reroute');
+    // Crossing the course is a safety cost, so every ranking charges for it. Police cost does not choose an
+    // option: for a large event the organizer reports officer numbers are set by security, not by the route.
+    // Closure points (junctions where a side street meets the course) are the proxy for residents affected.
+    const crossing = (c) => c.change.crossings * 1000,
+      closures = (c) => c.score.sites.length;
+    take((c) => Math.abs(c.change.delta) + crossing(c) + closures(c), 'Closest-distance reroute');
+    take((c) => closures(c) * 100 + Math.abs(c.change.delta) + crossing(c), 'Fewest-closures reroute');
     take(
       (c) => c.change.addedLength + c.change.removedLength + Math.abs(c.change.delta) + crossing(c),
       'Smallest-change reroute'
@@ -1274,7 +1292,7 @@
   function lonlat(x, y) {
     return [x / 88152 - 77.46, 37.56 - y / 111195];
   }
-  const VERSION = '4.3';
+  const VERSION = '4.4';
   const api = {
     VERSION,
     Heap,

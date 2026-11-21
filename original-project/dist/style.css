@@ -411,7 +411,8 @@ main {
   display: block;
 }
 .map-stage.picking svg#map,
-.map-stage.drawing svg#map {
+.map-stage.drawing svg#map,
+.map-stage.closing svg#map {
   cursor: crosshair;
 }
 .map-stage svg#map:active {
@@ -2703,4 +2704,12 @@ textarea {
   .built-section {
     break-before: page;
   }
+}
+.reroute-banner {
+  background: #f7efe6;
+  border-bottom-color: #e5d2bd;
+}
+.reroute-banner button:disabled {
+  opacity: 0.45;
+  cursor: default;
 }

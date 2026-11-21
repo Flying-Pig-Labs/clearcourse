@@ -157,6 +157,79 @@ const real = M.createNetwork(sandbox.window.RACE_DATA);
       Date.now() - t + 'ms'
     );
   }
+  // Reroute: the bundled 2026 marathon section with the N Lombardy St bridge closed.
+  const courseBox = { window: {} };
+  vm.runInNewContext(fs.readFileSync(require.resolve('../dist/courses.js'), 'utf8'), courseBox);
+  const bundle = courseBox.window.RACE_COURSES,
+    course = bundle.courses[0],
+    closed = course.closures[0].edges;
+  assert.equal(
+    bundle.datasetVersion,
+    sandbox.window.RACE_DATA.datasetVersion,
+    'Courses match the street snapshot'
+  );
+  assert.ok(
+    Math.abs(course.match.streetMeters - course.match.trackMeters) < 100,
+    'Course section matches its track'
+  );
+  for (const ei of closed) assert.ok(course.edges.includes(ei), 'The closed bridge is on the course');
+  const fixed = { nodes: [...course.nodes], edges: [...course.edges] };
+  let t = Date.now();
+  const rr = M.reroute(real, fixed, closed);
+  const rerouteMs = Date.now() - t;
+  assert.ok(rr.candidates.length >= 2, 'Several reroutes are offered');
+  assert.equal(rr.baseline.officers > 0 && Number.isFinite(rr.baseline.cost), true, 'Baseline is scored');
+  const at = [0];
+  course.edges.forEach((ei, i) => at.push(at[i] + real.data.edges[ei].l));
+  for (const c of rr.candidates) {
+    for (const ei of closed) assert.ok(!c.edges.includes(ei), 'A reroute never uses the closed street');
+    for (let i = 0; i < c.edges.length; i++) {
+      const e = real.data.edges[c.edges[i]];
+      assert.ok(
+        (e.a === c.nodes[i] && e.b === c.nodes[i + 1]) || (e.b === c.nodes[i] && e.a === c.nodes[i + 1]),
+        'A reroute is a connected course'
+      );
+    }
+    assert.equal(c.nodes[0], course.nodes[0], 'Same start');
+    assert.equal(c.nodes.at(-1), course.nodes.at(-1), 'Same finish');
+    const { detach, rejoin } = c.change;
+    assert.deepEqual(
+      c.edges.slice(0, detach.index),
+      fixed.edges.slice(0, detach.index),
+      'Course before is kept'
+    );
+    assert.deepEqual(
+      c.edges.slice(c.edges.length - (course.edges.length - rejoin.index)),
+      fixed.edges.slice(rejoin.index),
+      'Course after is kept'
+    );
+    assert.ok(Math.abs(c.length - at.at(-1) - c.change.delta) < 0.01, 'Length change is reported exactly');
+    assert.ok(Math.abs(c.change.delta) <= M.REROUTE.tolerance, 'Within the length tolerance');
+    // The replacement never reuses a street the kept course runs on.
+    const kept = new Set([...fixed.edges.slice(0, detach.index), ...fixed.edges.slice(rejoin.index)]);
+    for (const ei of c.change.addedEdges) assert.ok(!kept.has(ei), 'No reuse of the kept course');
+    assert.ok(
+      detach.at <= at[rr.first] && rejoin.at >= at[rr.last + 1],
+      'The replacement covers the closure'
+    );
+  }
+  assert.throws(() => M.reroute(real, fixed, [0]), /not on this course/, 'Closure must be on the course');
+  // A tiny tolerance with nothing in reach fails with an explanation, not an empty list.
+  assert.throws(
+    () => M.reroute(real, fixed, closed, { tolerance: 0.001, before: 1, after: 1 }),
+    /No replacement/
+  );
+  console.log(
+    'Lombardy reroutes',
+    rr.candidates.map((c) => ({
+      name: c.name,
+      delta: Math.round(c.change.delta),
+      officers: c.score.officers,
+      baseline: rr.baseline.officers,
+      crossings: c.change.crossings,
+    })),
+    rerouteMs + 'ms'
+  );
   console.log('All model tests passed.');
 })().catch((e) => {
   console.error(e);

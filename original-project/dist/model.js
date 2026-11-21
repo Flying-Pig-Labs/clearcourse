@@ -1097,13 +1097,184 @@
     };
   }
 
+  /* ---------- Reroute: replace the part of a fixed course that uses a closed street ---------- */
+
+  // Shortest-path tree from one node. penalty uses the same road-class weighting as route search.
+  function pathTree(net, source, penalty, blocked) {
+    const D = net.data,
+      dist = new Float64Array(D.nodes.length).fill(Infinity),
+      prev = new Int32Array(D.nodes.length).fill(-1),
+      prevEdge = new Int32Array(D.nodes.length).fill(-1),
+      heap = new Heap();
+    dist[source] = 0;
+    heap.push([0, source]);
+    while (heap.a.length) {
+      const [d, u] = heap.pop();
+      if (d > dist[u] + 1e-9) continue;
+      for (const [v, ei] of net.adj[u]) {
+        if (blocked.has(ei)) continue;
+        const nd = d + D.edges[ei].l * (1 + penalty * CLASS_PENALTY[D.edges[ei].c]);
+        if (nd < dist[v]) {
+          dist[v] = nd;
+          prev[v] = u;
+          prevEdge[v] = ei;
+          heap.push([nd, v]);
+        }
+      }
+    }
+    return { dist, prev, prevEdge };
+  }
+
+  const REROUTE = {
+    // How far before the first closed edge the course may leave, and after the last one it may rejoin.
+    before: 2500,
+    after: 2500,
+    // Largest change in course length a candidate may make. A certified course must make up any change elsewhere.
+    tolerance: 800,
+    // Road-class penalties searched: 0 is shortest; higher values prefer smaller streets.
+    penalties: [0, 0.6, 1.6, 4],
+    evaluateLimit: 80,
+    limit: 3,
+  };
+
+  // Keep the course fixed except one stretch around the closed edges, and search replacement stretches.
+  // A replacement leaves the course at a junction before the closure and rejoins it at a junction after it.
+  // It never uses a closed edge or any edge the rest of the course uses. It may cross the rest of the course
+  // at a junction; those crossings are counted, because runners would meet runners there.
+  function reroute(net, route, closed, options = {}) {
+    const o = { ...REROUTE, ...options },
+      D = net.data,
+      settings = o.settings || DEFAULTS,
+      closedSet = new Set(closed);
+    if (!route || !route.edges?.length) throw new Error('Load a course before searching for a reroute.');
+    const hits = route.edges.flatMap((e, i) => (closedSet.has(e) ? [i] : []));
+    if (!hits.length) throw new Error('The closed street is not on this course.');
+    const first = hits[0],
+      last = hits[hits.length - 1],
+      n = route.nodes.length,
+      at = [0];
+    route.edges.forEach((e, i) => at.push(at[i] + D.edges[e].l));
+    const junction = (k) => k === 0 || k === n - 1 || net.adj[route.nodes[k]].length >= 3;
+    const detach = [],
+      rejoin = [];
+    for (let i = first; i >= 0 && at[first] - at[i] <= o.before; i--) if (junction(i)) detach.push(i);
+    for (let j = last + 1; j < n && at[j] - at[last + 1] <= o.after; j++) if (junction(j)) rejoin.push(j);
+    if (!detach.length || !rejoin.length)
+      throw new Error('The closure is too close to the start or finish to reroute around it.');
+    const baseline = evaluate(net, { ...route, length: at[n - 1] }, settings);
+    // The rest of the course is everything outside the widest window that could be replaced.
+    const firstOut = Math.min(...detach),
+      lastIn = Math.max(...rejoin);
+    const positions = new Map();
+    route.edges.forEach((e, k) => positions.set(e, [...(positions.get(e) || []), k]));
+    const found = [];
+    for (const i of detach)
+      for (const penalty of o.penalties) {
+        // Edges the kept course uses are off limits. Edges between the detach point and the closure, and
+        // after the closure, are left open: using them is the same as leaving or rejoining at another junction.
+        const blocked = new Set(closedSet);
+        route.edges.forEach((e, k) => {
+          if (k < i || k >= lastIn) blocked.add(e);
+        });
+        const tree = pathTree(net, route.nodes[i], penalty, blocked);
+        for (const j of rejoin) {
+          const target = route.nodes[j];
+          if (!Number.isFinite(tree.dist[target])) continue;
+          const nodes = [target],
+            edges = [];
+          let v = target,
+            ok = true;
+          while (v !== route.nodes[i]) {
+            edges.push(tree.prevEdge[v]);
+            v = tree.prev[v];
+            if (v < 0) {
+              ok = false;
+              break;
+            }
+            nodes.push(v);
+          }
+          if (!ok || !edges.length) continue;
+          // The search left the course after the closure open; a replacement for this rejoin point must
+          // still not run on any street the course keeps.
+          if (edges.some((e) => (positions.get(e) || []).some((k) => k < i || k >= j))) continue;
+          nodes.reverse();
+          edges.reverse();
+          const added = edges.reduce((s, e) => s + D.edges[e].l, 0),
+            removed = at[j] - at[i],
+            delta = added - removed;
+          if (Math.abs(delta) > o.tolerance) continue;
+          found.push({ i, j, penalty, nodes, edges, added, removed, delta });
+        }
+      }
+    // Several (detach, rejoin, penalty) combinations give the same replacement; keep one of each.
+    const unique = [...new Map(found.map((c) => [c.i + ':' + c.j + ':' + c.edges.join(','), c])).values()];
+    unique.sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta) || a.added - b.added);
+    const kept = new Set([...route.nodes.slice(0, firstOut), ...route.nodes.slice(lastIn + 1)]);
+    const candidates = unique.slice(0, o.evaluateLimit).map((c) => {
+      const nodes = [...route.nodes.slice(0, c.i), ...c.nodes, ...route.nodes.slice(c.j + 1)],
+        edges = [...route.edges.slice(0, c.i), ...c.edges, ...route.edges.slice(c.j)];
+      const r = { nodes, edges, length: edges.reduce((s, e) => s + D.edges[e].l, 0) };
+      const crossings = c.nodes.slice(1, -1).filter((v) => kept.has(v)).length;
+      const streets = [];
+      for (const e of c.edges) if (streets[streets.length - 1] !== D.edges[e].n) streets.push(D.edges[e].n);
+      return {
+        ...r,
+        score: evaluate(net, r, settings),
+        change: {
+          detach: { index: c.i, node: route.nodes[c.i], at: at[c.i] },
+          rejoin: { index: c.j, node: route.nodes[c.j], at: at[c.j] },
+          removedLength: c.removed,
+          addedLength: c.added,
+          delta: c.delta,
+          crossings,
+          streets,
+          addedEdges: c.edges,
+        },
+      };
+    });
+    if (!candidates.length)
+      throw new Error(
+        `No replacement within ${Math.round(o.tolerance)} m of the original length leaves and rejoins the course within ${Math.round(o.before)} m of the closure without reusing the course.`
+      );
+    const distinct = (c, chosen) =>
+      chosen.every((s) => {
+        const a = new Set(s.change.addedEdges),
+          shared = c.change.addedEdges.filter((e) => a.has(e)).length;
+        return shared / Math.max(a.size, c.change.addedEdges.length) <= 0.6;
+      });
+    const chosen = [];
+    const take = (fn, name) => {
+      const pick = candidates
+        .slice()
+        .sort((a, b) => fn(a) - fn(b))
+        .find((c) => !chosen.includes(c) && distinct(c, chosen));
+      if (pick) chosen.push({ ...pick, name, id: routeId(pick.edges) });
+    };
+    // Crossing the course is a safety cost, so every ranking charges for it.
+    const crossing = (c) => c.change.crossings * 1000;
+    take((c) => Math.abs(c.change.delta) + crossing(c) + c.score.officers, 'Closest-distance reroute');
+    take((c) => c.score.cost + Math.abs(c.change.delta) * 2 + crossing(c) * 20, 'Lowest-cost reroute');
+    take(
+      (c) => c.change.addedLength + c.change.removedLength + Math.abs(c.change.delta) + crossing(c),
+      'Smallest-change reroute'
+    );
+    return {
+      closed: [...closedSet],
+      first,
+      last,
+      baseline,
+      searched: unique.length,
+      candidates: chosen.slice(0, o.limit),
+    };
+  }
+
   function xy(lon, lat) {
     return [(lon + 77.46) * 88152, (37.56 - lat) * 111195];
   }
   function lonlat(x, y) {
     return [x / 88152 - 77.46, 37.56 - y / 111195];
   }
-  const VERSION = '4.2';
+  const VERSION = '4.3';
   const api = {
     VERSION,
     Heap,
@@ -1118,6 +1289,8 @@
     evaluate,
     generate,
     matchTrack,
+    reroute,
+    REROUTE,
     routeId,
     isApproach,
     isLimitedAccess,

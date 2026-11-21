@@ -437,6 +437,49 @@ async function step(name, fn) {
     assert.ok((await page.locator('#howBuilt .built-sources a').count()) >= 10, 'Sources are linked');
   });
 
+  await step('reroute mode: bundled marathon section reroutes around the Lombardy bridge', async () => {
+    await page.click('#rerouteButton');
+    assert.equal(await page.isVisible('#rerouteBanner'), true);
+    assert.equal(await page.isDisabled('#findReroutes'), true, 'Nothing closed yet');
+    await page.click('#loadCourseExample');
+    await page.waitForFunction(() => RaceLab.getSnapshot().state.routes[0].name.startsWith('2026 marathon'));
+    await page.waitForSelector('#mapLoading', { state: 'hidden' });
+    let s = await snapshot();
+    const closed = await page.evaluate(() => window.RACE_COURSES.courses[0].closures[0].edges);
+    const base = s.state.routes[0];
+    for (const ei of closed) assert.ok(base.edges.includes(ei), 'The current course uses the bridge');
+    const reroutes = s.state.routes.filter((r) => r.kind.startsWith('Reroute'));
+    assert.ok(reroutes.length >= 2, 'Reroutes are added');
+    for (const r of reroutes) for (const ei of closed) assert.ok(!r.edges.includes(ei), 'Avoids the bridge');
+    assert.equal(s.state.selected, reroutes[0].id, 'The first reroute is selected');
+    const note = await page.locator('#routeNote').innerText();
+    assert.match(note, /Leaves the course at .*mile 2\d/);
+    assert.match(note, /versus 2026 marathon/);
+    assert.equal(await page.isVisible('#rerouteBanner'), false);
+    // Close the bridge by clicking it on the current course.
+    await page.click(`[data-route="${base.id}"]`);
+    await page.click('#rerouteButton');
+    const point = await page.evaluate((edges) => {
+      const e = window.RACE_DATA.edges[edges[2]],
+        [x, y] = e.p[Math.floor(e.p.length / 2)],
+        m = document.getElementById('map').getScreenCTM();
+      return { x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f };
+    }, closed);
+    assert.match(await page.locator('#closureStatus').innerText(), /N Lombardy St/, 'Closure is remembered');
+    await page.click('#clearClosure');
+    assert.match(await page.locator('#closureStatus').innerText(), /Click the selected course/);
+    await page.waitForSelector('#toast', { state: 'hidden' });
+    await page.mouse.click(point.x, point.y);
+    assert.match(await page.locator('#closureStatus').innerText(), /N Lombardy St/);
+    assert.equal(await page.isDisabled('#findReroutes'), false);
+    await page.mouse.click(point.x, point.y);
+    assert.match(await page.locator('#closureStatus').innerText(), /Click the selected course/, 'Reopens');
+    await page.click('#cancelReroute');
+    assert.equal(await page.isVisible('#rerouteBanner'), false);
+    await page.click('#generateButton');
+    await idle();
+  });
+
   await step('page does not scroll sideways at phone width', async () => {
     const phone = await browser.newContext({
       viewport: { width: 390, height: 844 },

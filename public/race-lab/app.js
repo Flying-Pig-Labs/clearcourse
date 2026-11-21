@@ -52,6 +52,9 @@
   let activeSite = null,
     editing = false,
     picking = false,
+    // Closing streets on a fixed course, for the reroute search. Not saved: the reroutes it produces are.
+    closing = false,
+    closure = { routeId: null, edges: [] },
     drawPoints = [],
     drawRoute = null,
     showAll = false,
@@ -144,6 +147,10 @@
       edges: r.edges.slice(),
       nodes: r.nodes.slice(),
       length: r.edges.reduce((a, e) => a + D.edges[e].l, 0),
+      ...(r.note ? { note: String(r.note).slice(0, 600) } : {}),
+      ...(Number.isFinite(r.startMile) && r.startMile >= 0 && r.startMile < 30
+        ? { startMile: r.startMile }
+        : {}),
     };
   }
   function validateSession(s) {
@@ -450,7 +457,21 @@
           'vector-effect': 'non-scaling-stroke',
         })
       );
-      if (!editing && !picking) {
+      const closedHere = closure.routeId === r.id ? closure.edges : [];
+      if (closedHere.length)
+        routeLayer.append(
+          svg('path', {
+            d: closedHere.map((ei) => pathString(D.edges[ei].p)).join(''),
+            fill: 'none',
+            stroke: '#b4442f',
+            'stroke-width': 7,
+            'stroke-linecap': 'round',
+            'stroke-dasharray': '2 6',
+            'vector-effect': 'non-scaling-stroke',
+            class: 'closed-street',
+          })
+        );
+      if (!editing && !picking && !closing) {
         const sc = score(r);
         for (const s of sc.sites) {
           const o = state.overrides[r.id]?.[s.id],
@@ -627,6 +648,7 @@
       .join('');
     const pct = (a, b) => (b ? Math.round(((a - b) / b) * 100) : 0);
     $('routeNote').innerHTML =
+      (r.note ? `<strong>Reroute.</strong> ${escape(r.note)}<br>` : '') +
       (r.id === base.id
         ? `<strong>${sc.sites.length} locations to review.</strong> ${sc.major} involve an arterial under the model.${sc.freewayConnections ? ` ${sc.freewayConnections} touch a freeway ramp or interchange.` : ''} ${delta / target > state.constraints.tolerance ? `This candidate is ${n(delta, 2)} km from the target; revise its geometry before comparing equal-distance routes.` : ''}`
         : `<strong>${signed(sc.officers - baseScore.officers)} officers (${signed(pct(sc.officers, baseScore.officers))}%) and ${signedMoney(sc.cost - baseScore.cost)} (${signed(pct(sc.cost, baseScore.cost))}%)</strong> versus ${escape(base.name.toLowerCase())}. Burden index ${signed(pct(sc.index, baseScore.index))}%. Length differs by ${n(Math.abs(r.length - base.length) / 1000, 2)} km. ${Math.abs(r.length - base.length) / base.length > 0.1 ? 'Different distances: compare totals with care. ' : ''}${sc.major} arterial review sites.`) +
@@ -815,6 +837,7 @@
       return;
     }
     if (editing) endDrawing();
+    if (closing) endClosing();
     picking = false;
     $('mapStage').classList.remove('picking');
     $('pickStartButton').textContent = 'Choose start on map';
@@ -1044,6 +1067,7 @@
   }
   function startDrawing() {
     if (generating) return;
+    if (closing) endClosing();
     editing = true;
     picking = false;
     drawPoints = [];
@@ -1084,6 +1108,177 @@
     if (drawRoute)
       $('mapRouteName').textContent = `Your proposed route · ${n(drawRoute.length / 1000, 2)} km`;
     renderMapOverlays();
+  }
+  /* ---------- Reroute around a closed street ---------- */
+  const COURSES = window.RACE_COURSES || { courses: [] },
+    METERS_PER_MILE = 1609.344;
+  function startClosing() {
+    if (generating || editing || !active()) return;
+    closing = true;
+    picking = false;
+    $('mapStage').classList.remove('picking');
+    $('mapStage').classList.add('closing');
+    $('rerouteBanner').hidden = false;
+    $('rerouteButton').disabled = true;
+    if (closure.routeId !== active().id) closure = { routeId: active().id, edges: [] };
+    syncReroute();
+    renderMapOverlays();
+  }
+  function endClosing() {
+    closing = false;
+    $('mapStage').classList.remove('closing');
+    $('rerouteBanner').hidden = true;
+    $('rerouteButton').disabled = false;
+    render();
+  }
+  function syncReroute() {
+    const k = closure.edges.length,
+      names = [...new Set(closure.edges.map((ei) => D.edges[ei].n))];
+    $('closureStatus').textContent = k
+      ? `Closed: ${names.join(', ')} (${n(closure.edges.reduce((s, ei) => s + D.edges[ei].l, 0))} m)`
+      : 'Click the selected course to close a street block. Click it again to reopen it.';
+    $('findReroutes').disabled = !k;
+    $('clearClosure').disabled = !k;
+  }
+  // Close the whole block that was clicked: the run of course edges between junctions with other streets.
+  function toggleClosedAt(x, y) {
+    const r = active();
+    if (!r) return;
+    if (closure.routeId !== r.id) closure = { routeId: r.id, edges: [] };
+    let best = 40,
+      index = -1;
+    r.edges.forEach((ei, i) => {
+      const p = D.edges[ei].p;
+      for (let k = 1; k < p.length; k++) {
+        const [ax, ay] = p[k - 1],
+          [bx, by] = p[k],
+          vx = bx - ax,
+          vy = by - ay,
+          len2 = vx * vx + vy * vy || 1,
+          t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / len2)),
+          d = Math.hypot(x - ax - t * vx, y - ay - t * vy);
+        if (d < best) {
+          best = d;
+          index = i;
+        }
+      }
+    });
+    if (index < 0) {
+      toast('Click on the selected course to close part of it.');
+      return;
+    }
+    const block = (node) => net.adj[node].length <= 2;
+    let lo = index,
+      hi = index;
+    while (lo > 0 && block(r.nodes[lo])) lo--;
+    while (hi < r.edges.length - 1 && block(r.nodes[hi + 1])) hi++;
+    const run = r.edges.slice(lo, hi + 1),
+      open = run.every((ei) => closure.edges.includes(ei));
+    closure.edges = open
+      ? closure.edges.filter((ei) => !run.includes(ei))
+      : [...new Set([...closure.edges, ...run])];
+    syncReroute();
+    renderMapOverlays();
+  }
+  function mileLabel(r, meters) {
+    return r.startMile != null
+      ? 'mile ' + n(r.startMile + meters / METERS_PER_MILE, 2)
+      : n(meters / 1000, 2) + ' km from the start';
+  }
+  function rerouteNote(base, c) {
+    const ch = c.change,
+      at = (node) => [...new Set(net.adj[node].map(([, ei]) => D.edges[ei].n))].slice(0, 2).join(' / '),
+      delta = Math.round(ch.delta);
+    return (
+      `Leaves the course at ${at(ch.detach.node)} (${mileLabel(base, ch.detach.at)}) and rejoins at ${at(ch.rejoin.node)} (${mileLabel(base, ch.rejoin.at)}) via ${ch.streets.slice(0, 6).join(' → ')}${ch.streets.length > 6 ? ' …' : ''}. ` +
+      `Replaces ${n(ch.removedLength)} m with ${n(ch.addedLength)} m (${delta === 0 ? 'same length' : signed(delta) + ' m'}${delta ? '; make this up elsewhere and have the course re-measured' : ''}). ` +
+      (ch.crossings
+        ? `Crosses the rest of the course ${ch.crossings} time${ch.crossings === 1 ? '' : 's'}.`
+        : 'Does not cross the rest of the course.')
+    );
+  }
+  async function findReroutes() {
+    const base = active();
+    if (!base || closure.routeId !== base.id || !closure.edges.length) return;
+    $('findReroutes').disabled = true;
+    $('mapLoading').hidden = false;
+    $('loadingDetail').textContent = 'Searching replacement stretches around the closure…';
+    try {
+      await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+      const result = M.reroute(net, base, closure.edges, { settings: state.settings });
+      const fresh = result.candidates.map((c) => ({
+        id: c.id,
+        role: 'custom',
+        name: c.name,
+        kind: `Reroute · ${signed(Math.round(c.change.delta))} m`,
+        nodes: c.nodes,
+        edges: c.edges,
+        length: c.length,
+        ...(base.startMile != null ? { startMile: base.startMile } : {}),
+        note: rerouteNote(base, c),
+      }));
+      const ids = new Set([base.id, ...fresh.map((r) => r.id)]);
+      const others = state.routes.filter((r) => !ids.has(r.id));
+      const keep = others.filter(hasData);
+      const room = MAX_ROUTES - 1 - fresh.length - keep.length;
+      state.routes = [
+        base,
+        ...fresh,
+        ...keep,
+        ...others.filter((r) => !hasData(r)).slice(0, Math.max(0, room)),
+      ];
+      if (state.routes.length > MAX_ROUTES) state.routes = state.routes.slice(0, MAX_ROUTES);
+      for (const r of fresh) state.overrides[r.id] = state.overrides[r.id] || {};
+      const live = new Set(state.routes.map((r) => r.id));
+      for (const store of [state.overrides, state.calibration])
+        for (const id of Object.keys(store)) if (!live.has(id)) delete store[id];
+      state.selected = fresh[0]?.id || base.id;
+      recordAudit(
+        `Searched reroutes of ${base.name} around ${[...new Set(closure.edges.map((ei) => D.edges[ei].n))].join(', ')}`
+      );
+      endClosing();
+      fitRoute();
+      toast(
+        `${fresh.length} reroute${fresh.length === 1 ? '' : 's'} from ${n(result.searched)} replacement stretches. Each is compared with the original course, which still uses the closed street.`
+      );
+    } catch (e) {
+      toast(e.message || 'The reroute search could not complete.');
+      syncReroute();
+    } finally {
+      $('mapLoading').hidden = true;
+    }
+  }
+  async function loadCourseExample() {
+    const course = COURSES.courses[0];
+    if (!course) return;
+    if (COURSES.datasetVersion !== DATASET) {
+      toast('The bundled course was matched to a different street snapshot. Rebuild courses.js.');
+      return;
+    }
+    if (editing) endDrawing();
+    const route = {
+      id: M.routeId(course.edges),
+      role: 'custom',
+      name: '2026 marathon · mile 20 to finish',
+      kind: 'Published course · Sports Backers route',
+      nodes: course.nodes.slice(),
+      edges: course.edges.slice(),
+      length: course.edges.reduce((s, ei) => s + D.edges[ei].l, 0),
+      startMile: course.section.startMile,
+      note: `The current course. It crosses the ${course.closures[0].name}, which the City plans to close for about two years from spring 2027. Source: ${course.source.route} (updated ${course.source.routeUpdated}).`,
+    };
+    const others = state.routes.filter((r) => r.id !== route.id);
+    state.routes = [route, ...others.filter(hasData), ...others.filter((r) => !hasData(r))].slice(
+      0,
+      MAX_ROUTES
+    );
+    state.overrides[route.id] = state.overrides[route.id] || {};
+    state.selected = route.id;
+    closure = { routeId: route.id, edges: course.closures[0].edges.slice() };
+    recordAudit('Loaded the bundled 2026 marathon course section');
+    render();
+    fitRoute();
+    await findReroutes();
   }
   // Returns 'added', 'exists' (the same route is already in the session) or 'full'.
   function addRoute(r, name, kind) {
@@ -1723,6 +1918,7 @@
         kind: r.kind,
         s: r.nodes[0],
         e: r.edges,
+        ...(r.note ? { n: r.note } : {}),
       })),
       overrides: state.routes.map((r) => state.overrides[r.id] || {}),
     };
@@ -1740,6 +1936,7 @@
       role: r.role,
       name: r.name,
       kind: r.kind,
+      note: r.n,
     }));
     return {
       ...x,
@@ -2011,6 +2208,15 @@
   $('importButton').addEventListener('click', () => $('fileInput').click());
   $('fileInput').addEventListener('change', () => importFile($('fileInput').files[0]));
   $('drawButton').addEventListener('click', startDrawing);
+  $('rerouteButton').addEventListener('click', startClosing);
+  $('cancelReroute').addEventListener('click', endClosing);
+  $('clearClosure').addEventListener('click', () => {
+    closure.edges = [];
+    syncReroute();
+    renderMapOverlays();
+  });
+  $('findReroutes').addEventListener('click', findReroutes);
+  $('loadCourseExample').addEventListener('click', loadCourseExample);
   $('cancelDraw').addEventListener('click', endDrawing);
   $('undoPoint').addEventListener('click', () => {
     drawPoints.pop();
@@ -2038,7 +2244,7 @@
       toast('Your route is scored using the same assumptions as the other candidates.');
   });
   $('pickStartButton').addEventListener('click', () => {
-    if (editing || generating) return;
+    if (editing || generating || closing) return;
     picking = !picking;
     $('mapStage').classList.toggle('picking', picking);
     $('pickStartButton').textContent = picking ? 'Click a street to set the start' : 'Choose start on map';
@@ -2058,7 +2264,7 @@
   $('fitMap').addEventListener('click', () => fitRoute());
   let pointer = null;
   $('map').addEventListener('pointerdown', (e) => {
-    if (e.target.closest('[data-site]') && !editing && !picking) return;
+    if (e.target.closest('[data-site]') && !editing && !picking && !closing) return;
     pointer = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
     $('map').setPointerCapture(e.pointerId);
   });
@@ -2080,6 +2286,11 @@
     pointer = null;
     if ($('map').hasPointerCapture(e.pointerId)) $('map').releasePointerCapture(e.pointerId);
     if (moved) return;
+    if (closing) {
+      const w = screenToWorld(e.clientX, e.clientY);
+      toggleClosedAt(w.x, w.y);
+      return;
+    }
     if (!editing && !picking) return;
     const p = screenToWorld(e.clientX, e.clientY),
       nearest = net.nearest(p.x, p.y, 200);

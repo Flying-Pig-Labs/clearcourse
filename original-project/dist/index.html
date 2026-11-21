@@ -37,7 +37,7 @@
         ><button id="builtNav">How it was built</button>
       </nav>
       <div class="header-actions">
-        <span class="prototype"><span></span> Research update · v4.2</span>
+        <span class="prototype"><span></span> Research update · v4.3</span>
         <div class="export-wrap">
           <button class="button outline" id="exportButton">Export <span aria-hidden="true">↗</span></button>
           <div class="export-menu" id="exportMenu" hidden>
@@ -159,6 +159,12 @@
               <div class="map-heading-actions">
                 <button class="button small outline" id="drawButton">
                   <span aria-hidden="true">⌁</span> Draw route</button
+                ><button
+                  class="button small outline"
+                  id="rerouteButton"
+                  title="Close a street on the selected course and search replacement stretches"
+                >
+                  Reroute <span aria-hidden="true">⤳</span></button
                 ><button class="button small outline" id="importButton">
                   Import <span aria-hidden="true">↑</span>
                 </button>
@@ -176,6 +182,22 @@
                 <button id="undoPoint">Undo</button><button id="closeLoop">Close loop</button
                 ><button class="save-draw" id="scoreDraw">Score route</button
                 ><button id="cancelDraw" aria-label="Cancel drawing">×</button>
+              </div>
+            </div>
+            <div class="draw-banner reroute-banner" id="rerouteBanner" hidden>
+              <div>
+                <strong>Reroute around a closed street</strong
+                ><span id="closureStatus">Click the selected course to close a street block.</span>
+              </div>
+              <div>
+                <button
+                  id="loadCourseExample"
+                  title="Load miles 20 to the finish of the 2026 Richmond Marathon with the N Lombardy St bridge closed"
+                >
+                  2026 marathon · Lombardy bridge</button
+                ><button id="clearClosure">Clear</button
+                ><button class="save-draw" id="findReroutes">Find reroutes</button
+                ><button id="cancelReroute" aria-label="Close reroute mode">×</button>
               </div>
             </div>
             <div class="map-stage" id="mapStage">
@@ -565,6 +587,12 @@
               </li>
               <li>
                 Drawn routes follow the shortest street path between clicks and may double back on a street.
+              </li>
+              <li>
+                Reroute keeps a fixed course and replaces only the stretch around a closed street. It leaves
+                and rejoins the course within 2.5 km of the closure, never reuses the rest of the course, and
+                keeps the length change within 800 m. The bundled example is the 2026 marathon from mile 20,
+                with the N Lombardy St bridge over CSX closed.
               </li>
             </ul>
           </article>
@@ -1104,6 +1132,7 @@
     />
     <div class="toast" id="toast" role="status" hidden></div>
     <script src="data.js"></script>
+    <script src="courses.js"></script>
     <script src="model.js"></script>
     <script src="planning.js"></script>
     <script src="app.js"></script>

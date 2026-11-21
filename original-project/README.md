@@ -110,6 +110,42 @@ Measured on the bundled network across 51 distinct generated routes:
 
 A track more than 50 m from any routable street for more than 200 m is rejected with the location.
 
+## Reroute around a closure (version 4.3)
+
+**Reroute** keeps a fixed course and replaces only the stretch that uses a closed street. Click the selected course to close a block (the run of course streets between junctions with other streets); click it again to reopen it. **Find reroutes** then:
+
+1. Takes every junction on the course up to 2.5 km before the first closed edge as a place to leave, and every junction up to 2.5 km after the last closed edge as a place to rejoin.
+2. From each leaving point, builds shortest-path trees at four road-class penalties (0, 0.6, 1.6 and 4; higher values prefer smaller streets). The trees may not use a closed edge or any street the rest of the course uses.
+3. Keeps replacements within 800 m of the length they replace, drops any that would run on a street the kept course uses, and scores each full course with the same staffing model.
+4. Offers up to three distinct options (at most 60% of their new streets shared):
+   - **Closest-distance:** smallest length change.
+   - **Lowest-cost:** lowest estimated staffing cost.
+   - **Smallest-change:** shortest stretch changed.
+
+   Each ranking adds a large penalty for every point where the replacement crosses the rest of the course.
+
+The original course stays first in the comparison, so each reroute's card and note show officers, cost and distance against it. A length change has to be made up elsewhere, and the course re-measured. The search does not do either.
+
+**Bundled example: 2026 marathon, mile 20 to the finish.**
+
+- **Source.** Sports Backers' RideWithGPS route 43438423, linked from the official course page. The route was updated 2026-09-17 and read 2026-11-21. Only the part from mile 20 is bundled, because miles 9–18 run west of the street snapshot.
+- **Matched course.** `tools/build_courses.cjs` matches the saved track (`tools/courses/`) to the street snapshot: 10,376 m of streets from 10,396 m of track, mean offset 2.3 m.
+- **Closure.** The script closes N Lombardy St from the Admiral St traffic circle to W Leigh St, at course miles 24.26–24.48:
+  - OpenStreetMap way 692891947 puts the bridge deck in that block.
+  - The City describes the project as between Moore and Admiral streets.
+  - The City plans a full closure of about two years from spring 2027.
+
+**Results on that section** (default model):
+
+| Course                                                                                                                                                                   | Length change | Officers | Est. cost |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- | -------- | --------- |
+| Current course (uses the bridge)                                                                                                                                         | —             | 130      | $48,280   |
+| Closest-distance reroute (leaves at the Admiral St circle, mile 24.24; School Rd, Admiral St, Brook Rd, Chamberlayne Pkwy, N Adams St; rejoins W Grace St at mile 25.95) | +3 m          | 144      | $53,320   |
+| Lowest-cost reroute (as above to Chamberlayne Pkwy, then W Jackson St, St James St, E Clay St, N 1st St)                                                                 | +45 m         | 142      | $52,600   |
+| Smallest-change reroute (stays on Brook Rd at mile 23.98; Mitchell St, N Belvidere St, W Broad St, N Pine St; rejoins at mile 25.34)                                     | −21 m         | 154      | $56,920   |
+
+These are search outputs, not proposals. The closest-distance option threads several small residential streets. None of the three crosses the rest of the course. Every option adds officers, because each one runs through more junctions than the bridge does. These are model estimates, and the posts and junctions still need review by RPD and Sports Backers.
+
 ## Sessions, IDs and dataset versions
 
 `tools/enrich_data.py` stamps `datasetVersion` into `dist/data.js` from a SHA-256 hash of the street graph (`richmond-centerlines-2026-11-02-64e8dbb27033` for the bundled snapshot). Worksheets, sessions and the audit log record it. Node and edge IDs are only meaningful for one graph, so:
@@ -187,7 +223,7 @@ npm test                 # model, planning and regression suites
 npm run lint             # ESLint, recommended rules
 npm run format:check     # Prettier
 npm i -D playwright && npx playwright install chromium
-npm run test:ui          # 18 browser tests
+npm run test:ui          # 20 browser tests
 ```
 
 `tests/regression.test.cjs` and `tests/ui.test.cjs` guard each defect fixed in version 3 and each feature added in version 4. All 18 browser tests pass on version 4.1.
@@ -199,6 +235,10 @@ npm run test:ui          # 18 browser tests
 Use one past race and its real closure/staffing plan. Import its GPX, review detected junctions, replace default weights and staffing counts, assess route suitability, width, transit, construction, emergency and residential access, and compare predicted resources with the actual deployment. No staffing reduction is established by this prototype.
 
 Remaining production work includes operational staffing data, local validation, lane/width and turning-movement data, directional/capacity-aware access analysis, formally governed GIS refreshes, durable shared records, full immutable audit/version histories, and a constrained solver if the validated pilot warrants it. Type checking (for example JSDoc with `tsc --checkJs`) is not set up.
+
+## Version 4.3
+
+Adds reroute mode (`RaceModel.reroute`): close a street block on a fixed course and search replacement stretches that leave and rejoin the course around it. Adds the bundled 2026 Richmond Marathon section from mile 20 with the N Lombardy St bridge closure (`dist/courses.js`, built by `tools/build_courses.cjs`). Route notes are kept in sessions and share links. Model version 4.3.
 
 ## Version 4.2
 

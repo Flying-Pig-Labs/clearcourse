@@ -274,6 +274,43 @@ async function step(name, fn) {
     await page.keyboard.press('Escape');
   });
 
+  await step('supervision rule and bridge posts change officers and cost', async () => {
+    const before = (await snapshot()).selectedScore;
+    assert.ok(before.supervision.firstLine >= 1, 'Default rule adds a first-line supervisor');
+    await page.click('#assumptionsButton');
+    await page.selectOption('#settingSupervision', 'off');
+    await page.fill('#settingTrafficPremium', '0');
+    await page.click('#saveModel');
+    let s = await snapshot();
+    assert.equal(s.state.settings.supervision, 'off');
+    assert.equal(s.selectedScore.cost, s.selectedScore.postCost, 'Posts only, no premium');
+    await page.click('#assumptionsButton');
+    await page.click('#resetModel');
+    await page.keyboard.press('Escape');
+    s = await snapshot();
+    assert.equal(s.state.settings.supervision, 'table', 'Reset restores the default reading');
+    const row = page.locator('tr[data-review]').first();
+    const id = Number(await row.getAttribute('data-review'));
+    const site = s.selectedScore.sites.find((x) => x.id === id);
+    await row.click();
+    await page.check('#siteBridge');
+    await page.fill('#siteNote', 'Bridge in the published course plan');
+    await page.click('#saveSite');
+    s = await snapshot();
+    const after = s.selectedScore.sites.find((x) => x.id === site.id);
+    assert.equal(after.officers, site.officers + 1, 'A bridge adds one officer by default');
+    assert.equal(s.selectedScore.bridges, 1);
+    assert.equal(s.state.overrides[s.state.selected][site.id].bridge, true);
+    await page.click('#explainPanel summary');
+    const text = await page.locator('#explainBody').innerText();
+    for (const phrase of ['Supervision', 'General Order 04-06', 'bridge'])
+      assert.ok(text.includes(phrase), phrase);
+    await page.click('#explainPanel summary');
+    await page.locator(`tr[data-review="${site.id}"]`).click();
+    await page.click('#resetSite');
+    assert.equal((await snapshot()).selectedScore.bridges, 0);
+  });
+
   await step('version-1 sessions migrate to hashed IDs with their edits', async () => {
     const legacy = await page.evaluate(() => {
       const s = RaceLab.getSnapshot().state;

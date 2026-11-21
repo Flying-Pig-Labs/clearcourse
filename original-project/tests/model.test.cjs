@@ -50,7 +50,55 @@ const rolling = M.evaluate(net, route, { ...M.DEFAULTS, mode: 'rolling' });
 assert.ok(rolling.officerHours < full.officerHours, 'Rolling estimates should use location passage windows');
 const paid = M.evaluate(net, route, { ...M.DEFAULTS, minimumShift: 4 });
 assert.equal(paid.paidHours, 20, 'Minimum paid shift applies per officer per site');
-assert.equal(paid.cost, 1700, 'Rate multiplies paid hours');
+assert.equal(paid.postCost, 1700, 'Rate multiplies paid hours');
+assert.equal(paid.trafficCost, 100, 'GO 04-06 §6f adds $5 per billed traffic-control hour');
+assert.deepEqual(
+  [paid.supervision.acting, paid.supervision.firstLine, paid.supervision.command],
+  [0, 1, 0],
+  'Five officers at once need one first-line supervisor'
+);
+assert.equal(
+  paid.supervision.cost,
+  4 * (85 + 3 + 5),
+  'A supervisor bills the event window at rate + $3 + $5'
+);
+assert.equal(paid.cost, 1700 + 100 + 372, 'Cost sums posts, traffic premium and supervision');
+assert.equal(paid.headcount, 6);
+const postsOnly = M.evaluate(net, route, { ...M.DEFAULTS, supervision: 'off', trafficPremium: 0 });
+assert.equal(postsOnly.cost, 1700, 'With supervision off and no premium, cost is the version 4 formula');
+// General Order 04-06 §7c, both readings.
+const sv = (n, rule) => Object.values(M.supervision(n, rule));
+assert.deepEqual(sv(2), [0, 0, 0]);
+assert.deepEqual(sv(3), [1, 0, 0], '3-4 officers: one is paid as supervisor');
+assert.deepEqual(sv(4), [1, 0, 0]);
+assert.deepEqual(sv(5), [0, 1, 0]);
+assert.deepEqual(sv(10), [0, 1, 0]);
+assert.deepEqual(sv(11), [0, 2, 1], '11-15: 2 supervisors and a lieutenant');
+assert.deepEqual(sv(15), [0, 2, 1]);
+assert.deepEqual(sv(16), [0, 3, 1]);
+assert.deepEqual(sv(400), [0, 3, 1], 'The examples cap at 3 + 1');
+for (const n of [3, 5, 10, 11, 15, 16, 20])
+  assert.deepEqual(sv(n, 'perFive'), sv(n), `The two readings agree at ${n}`);
+assert.deepEqual(sv(21, 'perFive'), [0, 4, 1], 'The text adds one supervisor per further five');
+assert.deepEqual(sv(400, 'perFive'), [0, 79, 1]);
+assert.deepEqual(sv(400, 'off'), [0, 0, 0]);
+// A bridge adds officers on top of the post's base, including a planner's own count.
+const bridged = M.evaluate(net, route, M.DEFAULTS, { 1: { bridge: true, note: 'Bridge' } });
+const site1 = bridged.sites.find((s) => s.id === 1),
+  plain1 = full.sites.find((s) => s.id === 1);
+assert.equal(site1.officers, plain1.officers + 1, 'Default bridge adds one officer');
+assert.equal(site1.baseOfficers, plain1.officers);
+assert.ok(site1.reasons.includes('BRIDGE'));
+assert.equal(bridged.bridges, 1);
+const bridgedEdit = M.evaluate(
+  net,
+  route,
+  { ...M.DEFAULTS, bridgeOfficers: 2 },
+  {
+    1: { officers: 4, bridge: true, note: 'Bridge' },
+  }
+);
+assert.equal(bridgedEdit.sites.find((s) => s.id === 1).officers, 6);
 const twice = { nodes: [0, 1, 2, 3, 0, 1, 2, 3, 0], edges: [0, 1, 2, 3, 0, 1, 2, 3], length: 800 };
 const repeat = M.evaluate(net, twice, { ...M.DEFAULTS, mode: 'rolling' });
 assert.equal(repeat.sites.length, 3, 'Repeated passages must not duplicate physical sites');

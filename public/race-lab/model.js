@@ -28,6 +28,18 @@
     alleyBarriers: 0,
     // Typical distance from street centerline to curb, used only for the shortest-route distance estimate.
     curbOffset: 4.5,
+    // General Order 04-06 (04/03/2024) §6f: +$5/hour when an officer's primary assignment is traffic control.
+    // It is added for every billed hour of post officers and first-line supervisors, not command officers.
+    trafficPremium: 5,
+    // General Order 04-06 §6a: on-site supervisors earn $3 and command officers $6 above the extra-duty rate.
+    supervisorPremium: 3,
+    commandPremium: 6,
+    // General Order 04-06 §7c, which reads two ways. 'table': its worked examples, capped at 3 first-line
+    // supervisors and 1 lieutenant for 16 or more officers. 'perFive': its text, one more supervisor for each
+    // further five officers. 'off': post officers only.
+    supervision: 'table',
+    // Extra officers at a bridge: a post where officers move traffic through gaps in the runners. Illustrative.
+    bridgeOfficers: 1,
   };
   const CLASSES = ['Local', 'Collector', 'Minor arterial', 'Principal arterial'];
   // DPW street types for freeway connections. They are excluded from race routing but are side approaches.
@@ -56,6 +68,16 @@
   // Which Richmond PD agreement applies to a plan with this many officers.
   function rpdAgreement(officers) {
     return officers >= RPD.specialEventOfficers ? RPD.special : RPD.single;
+  }
+  // Supervisors General Order 04-06 §7b-c requires for `officers` working at the same time.
+  // `acting` is a post officer paid as supervisor; first-line and command officers are added people.
+  function supervision(officers, rule = DEFAULTS.supervision) {
+    const n = Math.max(0, Math.floor(Number(officers) || 0));
+    if (rule === 'off' || n < 3) return { acting: 0, firstLine: 0, command: 0 };
+    if (n < 5) return { acting: 1, firstLine: 0, command: 0 };
+    const firstLine =
+      rule === 'perFive' ? Math.max(1, Math.floor((n - 1) / 5)) : n <= 10 ? 1 : n <= 15 ? 2 : 3;
+    return { acting: 0, firstLine, command: n >= 11 ? 1 : 0 };
   }
   const REUSE_PENALTY = 2.8;
   const COS_45 = Math.SQRT1_2;
@@ -419,10 +441,12 @@
         net.factCache?.set(factKey, facts);
       }
       s.facts = facts;
-      s.officers =
+      s.bridge = o.bridge === true;
+      s.baseOfficers =
         o.officers === undefined
           ? Number(p.officers[s.c]) + (facts.signal ? Number(p.signalOfficers) : 0)
           : Number(o.officers);
+      s.officers = s.baseOfficers + (s.bridge ? Number(p.bridgeOfficers) || 0 : 0);
       s.barriers = o.barriers === undefined ? Number(p.barriers[s.c]) * s.approaches : Number(o.barriers);
       s.note = o.note || '';
       s.begin = p.mode === 'full' ? -p.setup : Math.min(...s.km) * p.fast - p.setup;
@@ -448,6 +472,7 @@
         ...(facts.signal ? ['SIGNAL_GIS_MATCH'] : []),
         ...(facts.adt ? ['ADT_SPATIAL_MATCH'] : []),
         ...(facts.speed ? ['POSTED_SPEED'] : []),
+        ...(s.bridge ? ['BRIDGE'] : []),
         ...(Object.keys(o).length ? ['PLANNER_OVERRIDE'] : []),
       ];
       s.control = p.mode === 'full' ? 0 : Math.min(...s.km) * p.fast;
@@ -480,6 +505,21 @@
     // move between posts instantly. For 5K and 10K courses the two are equal: no post closes before
     // another opens.
     const officers = sites.reduce((sum, s) => sum + s.officers, 0);
+    // Supervision is set by officers on duty at the same time. Supervisors cover the whole event window.
+    const rate = Number(p.rate) || 0,
+      traffic = Number(p.trafficPremium) || 0,
+      sup = supervision(peak, p.supervision),
+      eventHours = sites.length
+        ? (Math.max(...sites.map((s) => s.end)) - Math.min(...sites.map((s) => s.begin))) / 60
+        : 0,
+      supervisorHoursEach = sites.length ? billedHours(eventHours, p) : 0,
+      actingHours = Math.max(0, ...sites.map((s) => s.billedHoursEach)),
+      postCost = paidHours * rate,
+      trafficCost = paidHours * traffic,
+      actingCost = sup.acting * actingHours * (Number(p.supervisorPremium) || 0),
+      firstLineCost =
+        sup.firstLine * supervisorHoursEach * (rate + (Number(p.supervisorPremium) || 0) + traffic),
+      commandCost = sup.command * supervisorHoursEach * (rate + (Number(p.commandPremium) || 0));
     let turns = 0,
       changes = 0;
     for (let i = 1; i < route.edges.length; i++) {
@@ -507,8 +547,19 @@
       freewayConnections: sites.filter((s) => s.limitedAccess).length,
       officers,
       peak,
+      bridges: sites.filter((s) => s.bridge).length,
+      supervision: {
+        ...sup,
+        rule: p.supervision,
+        eventHours,
+        hoursEach: supervisorHoursEach,
+        cost: actingCost + firstLineCost + commandCost,
+      },
+      headcount: officers + sup.firstLine + sup.command,
       agreement: rpdAgreement(officers),
-      cost: paidHours * p.rate,
+      postCost,
+      trafficCost,
+      cost: postCost + trafficCost + actingCost + firstLineCost + commandCost,
       turns,
       changes,
       repeat: route.length ? 1 - uniqueLength / route.length : 0,
@@ -1052,7 +1103,7 @@
   function lonlat(x, y) {
     return [x / 88152 - 77.46, 37.56 - y / 111195];
   }
-  const VERSION = '4.0';
+  const VERSION = '4.2';
   const api = {
     VERSION,
     Heap,
@@ -1062,6 +1113,7 @@
     RPD,
     billedHours,
     rpdAgreement,
+    supervision,
     createNetwork,
     evaluate,
     generate,

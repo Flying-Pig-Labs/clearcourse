@@ -94,6 +94,10 @@
       signalOfficers: 20,
       alleyBarriers: 20,
       curbOffset: 15,
+      trafficPremium: 100,
+      supervisorPremium: 100,
+      commandPremium: 100,
+      bridgeOfficers: 20,
     }))
       if (Number.isFinite(s[k]) && s[k] >= 0 && s[k] <= max) r[k] = s[k];
     if (r.fast < 2) r.fast = 2;
@@ -104,6 +108,7 @@
     if (['rpd', 'exact'].includes(s.billing)) r.billing = s.billing;
     else if (s.minimumShift === 0) r.minimumShift = M.DEFAULTS.minimumShift;
     if (/^([01]\d|2[0-3]):[0-5]\d$/.test(s.start || '')) r.start = s.start;
+    if (['table', 'perFive', 'off'].includes(s.supervision)) r.supervision = s.supervision;
     return r;
   }
   function validateRoute(r, legacyId) {
@@ -181,6 +186,7 @@
             Number(o[k]) <= (k === 'class' ? 3 : 100)
           )
             item[k] = Number(o[k]);
+        if (o.bridge === true) item.bridge = true;
         out[id] = item;
       }
       r.overrides[route.id] = out;
@@ -583,15 +589,13 @@
         'Officers needed',
         n(sc.officers),
         '',
-        sc.peak < sc.officers
-          ? `Each post keeps its officers · at least ${n(sc.peak)} if officers could move instantly`
-          : `Each post keeps its officers · ${sc.agreement.form} applies`,
+        `${sc.peak < sc.officers ? `At posts · at least ${n(sc.peak)} if officers could move instantly` : `At posts · ${sc.agreement.form} applies`}${sc.supervision.firstLine + sc.supervision.command ? ` · plus ${supervisorText(sc.supervision)}` : ''}${sc.bridges ? ` · ${sc.bridges} bridge${sc.bridges === 1 ? '' : 's'}` : ''}`,
       ],
       [
         'Est. staffing cost',
         money(sc.cost),
         '',
-        `${money(state.settings.rate)}/h · ${state.settings.billing === 'exact' ? 'modeled hours' : `${n(state.settings.minimumShift)}-hour minimum`} · ${state.settings.mode === 'full' ? 'full closure' : 'rolling closure'}`,
+        `${money(state.settings.rate)}/h + ${money(state.settings.trafficPremium)} traffic · ${state.settings.billing === 'exact' ? 'modeled hours' : `${n(state.settings.minimumShift)}-hour minimum`} · ${state.settings.mode === 'full' ? 'full closure' : 'rolling closure'}`,
       ],
       [
         'Billed officer-hours',
@@ -643,6 +647,15 @@
     renderPlanning(sc);
     persist();
   }
+  function supervisorText(v) {
+    return [
+      v.acting ? '1 post officer paid as supervisor' : '',
+      v.firstLine ? `${v.firstLine} first-line supervisor${v.firstLine === 1 ? '' : 's'}` : '',
+      v.command ? `${v.command} lieutenant or above` : '',
+    ]
+      .filter(Boolean)
+      .join(' + ');
+  }
   // Formula traces for each headline number, tagged as data, assumption or rule.
   function explainHTML(r, sc) {
     const p = state.settings,
@@ -661,7 +674,7 @@
     const rows = [
       [
         'Officers needed',
-        `${n(sc.officers)} = ${byClass.join(' + ')}. Defaults per post: ${p.officers.join(' / ')} by road class${Number(p.signalOfficers) ? `, +${p.signalOfficers} at matched signals` : ''}${edited ? `; ${edited} post${edited === 1 ? '' : 's'} edited by planners` : ''}.${sc.peak < sc.officers ? ` If officers could move between posts instantly, ${n(sc.peak)} would still be on duty at the busiest moment.` : ' No post closes before another opens, so moving officers between posts would not reduce this.'}`,
+        `${n(sc.officers)} = ${byClass.join(' + ')}. Defaults per post: ${p.officers.join(' / ')} by road class${Number(p.signalOfficers) ? `, +${p.signalOfficers} at matched signals` : ''}${sc.bridges ? `, +${n(p.bridgeOfficers)} at each of ${n(sc.bridges)} bridge${sc.bridges === 1 ? '' : 's'}` : ''}${edited ? `; ${edited} post${edited === 1 ? '' : 's'} edited by planners` : ''}.${sc.peak < sc.officers ? ` If officers could move between posts instantly, ${n(sc.peak)} would still be on duty at the busiest moment.` : ' No post closes before another opens, so moving officers between posts would not reduce this.'}`,
         'Assumption',
         "RPD's Outside Employment Coordinator sets the real number (PD-119SPE ¶11).",
       ],
@@ -685,10 +698,18 @@
           : `Each officer bills at least ${n(p.minimumShift)} hours; a started hour bills in full past 15 minutes (PD-119SPE ¶13, ¶18).`,
       ],
       [
+        'Supervision',
+        p.supervision === 'off'
+          ? 'Not modeled: post officers only.'
+          : `${n(sc.peak)} officers on duty at once → ${supervisorText(sc.supervision) || 'no supervisor required'}${sc.supervision.firstLine + sc.supervision.command ? `, each billed ${n(sc.supervision.hoursEach, 2)} h for the ${n(sc.supervision.eventHours, 2)} h event window` : ''}. ${p.supervision === 'perFive' ? 'Reading: one more supervisor for each further five officers.' : 'Reading: the worked examples, capped at 3 supervisors and 1 lieutenant from 16 officers.'}`,
+        'Rule',
+        'General Order 04-06 §7c. Its text and its examples disagree above 20 officers; switch the reading under Model → Supervision rule.',
+      ],
+      [
         'Staffing cost',
-        `${n(sc.paidHours, 1)} billed h × ${money(p.rate)} = ${money(sc.cost)}.`,
+        `${n(sc.paidHours, 1)} billed h × (${money(p.rate)} + ${money(p.trafficPremium)} traffic) = ${money(sc.postCost + sc.trafficCost)}${sc.supervision.cost ? ` + supervision ${money(sc.supervision.cost)}` : ''} = ${money(sc.cost)}.`,
         'Assumption',
-        'PD-119SPE bills 1.5 × each officer’s personal hourly rate; the rate is a placeholder until invoices calibrate it.',
+        'PD-119SPE bills 1.5 × each officer’s personal hourly rate; the rate is a placeholder until invoices calibrate it. The $5 traffic premium and the $3/$6 supervisor and command differentials are General Order 04-06 §6a and §6f.',
       ],
       [
         'RPD agreement',
@@ -892,6 +913,11 @@
       'SignalOfficers',
       'AlleyBarriers',
       'CurbOffset',
+      'TrafficPremium',
+      'SupervisorPremium',
+      'CommandPremium',
+      'BridgeOfficers',
+      'Supervision',
     ])
       $('setting' + k).value = state.settings[k[0].toLowerCase() + k.slice(1)];
     $('modelError').textContent = '';
@@ -926,6 +952,10 @@
       'SignalOfficers',
       'AlleyBarriers',
       'CurbOffset',
+      'TrafficPremium',
+      'SupervisorPremium',
+      'CommandPremium',
+      'BridgeOfficers',
     ]) {
       let el = $('setting' + k),
         v = Number(el.value);
@@ -934,6 +964,9 @@
     }
     p.mode = $('settingMode').value;
     p.billing = $('settingBilling').value === 'exact' ? 'exact' : 'rpd';
+    p.supervision = ['table', 'perFive', 'off'].includes($('settingSupervision').value)
+      ? $('settingSupervision').value
+      : 'table';
     p.start = $('settingStart').value;
     if (!valid || p.fast > p.slow || !p.start) {
       $('modelError').textContent =
@@ -959,7 +992,8 @@
     $('siteDialogTitle').textContent = s.names.join(' / ');
     $('siteClass').innerHTML = M.CLASSES.map((v, i) => `<option value="${i}">${v}</option>`).join('');
     $('siteClass').value = s.c;
-    $('siteOfficers').value = s.officers;
+    $('siteOfficers').value = s.baseOfficers;
+    $('siteBridge').checked = s.bridge;
     $('siteBarriers').value = s.barriers;
     $('siteNote').value = s.note;
     $('siteSummary').innerHTML =
@@ -1001,6 +1035,7 @@
       officers,
       barriers,
       note: $('siteNote').value.trim(),
+      ...($('siteBridge').checked ? { bridge: true } : {}),
     };
     recordAudit('Overrode location ' + activeSite.id + ' on ' + r.name);
     $('siteDialog').close();
@@ -1645,11 +1680,11 @@
       ],
       [
         'Officers',
-        `${n(sc.officers)} at ${sc.sites.length} posts · ${sc.agreement.form}: request at least ${sc.agreement.lead} ahead`,
+        `${n(sc.officers)} at ${sc.sites.length} posts${sc.bridges ? ` (${n(sc.bridges)} bridges)` : ''}${sc.supervision.firstLine + sc.supervision.command ? ` + ${supervisorText(sc.supervision)}` : ''} · ${sc.agreement.form}: request at least ${sc.agreement.lead} ahead`,
       ],
       [
         'Billed hours and cost',
-        `${n(sc.paidHours, 1)} billed officer-hours × ${money(p.rate)} = ${money(sc.cost)} (illustrative rate)`,
+        `${n(sc.paidHours, 1)} billed officer-hours × (${money(p.rate)} + ${money(p.trafficPremium)} traffic)${sc.supervision.cost ? ` + supervision ${money(sc.supervision.cost)}` : ''} = ${money(sc.cost)} (illustrative rate)`,
       ],
       [
         'Barricades',
@@ -1660,7 +1695,7 @@
     const rows = posts
       .map((s, i) => {
         const [lon, lat] = M.lonlat(s.x, s.y);
-        return `<tr><td>${i + 1}</td><td>${escape(s.names.slice(0, 3).join(' / '))}${s.limitedAccess ? '<br><small>Freeway connection</small>' : ''}</td><td>${escape(M.CLASSES[s.c])}</td><td>${s.approaches}${s.alleys ? ` + ${s.alleys} alley` : ''}</td><td>${s.officers}</td><td>${s.barriers}</td><td>${time(s.startTime)} – ${time(s.endTime)}</td><td>${n(Math.min(...s.km), 2)}</td><td>${lat.toFixed(5)}, ${lon.toFixed(5)}</td><td>${escape(s.note)}</td></tr>`;
+        return `<tr><td>${i + 1}</td><td>${escape(s.names.slice(0, 3).join(' / '))}${s.limitedAccess ? '<br><small>Freeway connection</small>' : ''}${s.bridge ? '<br><small>Bridge: move traffic through gaps</small>' : ''}</td><td>${escape(M.CLASSES[s.c])}</td><td>${s.approaches}${s.alleys ? ` + ${s.alleys} alley` : ''}</td><td>${s.officers}</td><td>${s.barriers}</td><td>${time(s.startTime)} – ${time(s.endTime)}</td><td>${n(Math.min(...s.km), 2)}</td><td>${lat.toFixed(5)}, ${lon.toFixed(5)}</td><td>${escape(s.note)}</td></tr>`;
       })
       .join('');
     $('packet').innerHTML =
@@ -1693,7 +1728,8 @@
     };
   }
   function sessionFromShare(x) {
-    if (!x || x.v !== 2 || !Array.isArray(x.routes)) throw new Error('This link is not a ClearCourse scenario.');
+    if (!x || x.v !== 2 || !Array.isArray(x.routes))
+      throw new Error('This link is not a ClearCourse scenario.');
     if (x.d !== DATASET)
       throw new Error(
         `It was made with street snapshot ${String(x.d).slice(0, 60)}; this app uses ${DATASET}.`

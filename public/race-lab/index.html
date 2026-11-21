@@ -11,14 +11,26 @@
     <title>ClearCourse · Route planning prototype</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="favicon.ico" sizes="any" />
-    <link rel="apple-touch-icon" href="/__l5e/assets-v1/ba9f443b-e28c-4a1c-bb5f-d8e2c3e9b799/apple-touch-icon.png" />
+    <link
+      rel="apple-touch-icon"
+      href="/__l5e/assets-v1/ba9f443b-e28c-4a1c-bb5f-d8e2c3e9b799/apple-touch-icon.png"
+    />
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="clearcourse/brand.css" />
   </head>
   <body>
     <header class="topbar">
       <a class="brand" href="./index.html" aria-label="ClearCourse home"
-        ><span class="brand-lockup"><img class="brand-logo" src="/__l5e/assets-v1/304d10b8-c0a7-42bb-aa8a-edec362bae0a/logo-horizontal.svg" alt="ClearCourse" width="460" height="72" /><span class="brand-sub">RICHMOND, VIRGINIA</span></span></a>
+        ><span class="brand-lockup"
+          ><img
+            class="brand-logo"
+            src="/__l5e/assets-v1/304d10b8-c0a7-42bb-aa8a-edec362bae0a/logo-horizontal.svg"
+            alt="ClearCourse"
+            width="460"
+            height="72"
+          /><span class="brand-sub">RICHMOND, VIRGINIA</span></span
+        ></a
+      >
       <nav aria-label="Workspace">
         <button class="nav-active" id="planNav">Route workspace</button
         ><button id="modelNav">Model & sources <span aria-hidden="true">↗</span></button
@@ -363,14 +375,21 @@
           <span class="revision-badge" id="builtVersion">Model v4</span>
         </div>
         <p class="built-lead">
-          ClearCourse turns a race brief into candidate courses. For each one it estimates which streets close,
-          where officers and barricades go, what staffing costs and who loses road access. It runs entirely in
-          your browser on a snapshot of public Richmond data. Every number traces to a dataset, a published
-          rule or an assumption you can edit.
+          ClearCourse turns a race brief into candidate courses. For each one it estimates which streets
+          close, where officers and barricades go, what staffing costs and who loses road access. It runs
+          entirely in your browser on a snapshot of public Richmond data. Every number traces to a dataset, a
+          published rule or an assumption you can edit.
         </p>
         <picture class="brand-process">
-          <source media="(min-width: 900px)" srcset="/__l5e/assets-v1/8936b821-a100-461f-bee2-83862b9e34f9/how-it-works-desktop.svg" />
-          <img src="/__l5e/assets-v1/08b42199-0e44-4338-bea9-1a36fcd6a4d6/how-it-works-mobile.svg" loading="lazy" alt="Sketch a course: draw or import a route. Review the closures: inspect crossings and staffing assumptions. Compare the options: balance distance, staff time and estimated cost." />
+          <source
+            media="(min-width: 900px)"
+            srcset="/__l5e/assets-v1/8936b821-a100-461f-bee2-83862b9e34f9/how-it-works-desktop.svg"
+          />
+          <img
+            src="/__l5e/assets-v1/08b42199-0e44-4338-bea9-1a36fcd6a4d6/how-it-works-mobile.svg"
+            loading="lazy"
+            alt="Sketch a course: draw or import a route. Review the closures: inspect crossings and staffing assumptions. Compare the options: balance distance, staff time and estimated cost."
+          />
         </picture>
         <div class="built-stats" id="builtStats"></div>
         <div class="built-grid">
@@ -481,7 +500,19 @@
                 bills in full past 15 minutes. Ten or more officers fall under form PD-119SPE, requested 30
                 days ahead.
               </li>
-              <li>Cost = billed officer-hours × rate. The $85 rate is a placeholder.</li>
+              <li>
+                Cost = billed officer-hours × (rate + $5 traffic premium) + supervisors. The $85 rate is a
+                placeholder. The premium and supervisor rules come from RPD General Order 04-06.
+              </li>
+              <li>
+                Supervisors: 5–10 officers on duty at once need 1 first-line supervisor; 11–15 need 2 and a
+                lieutenant; the order's examples stop at 3 and a lieutenant from 16, while its text adds one
+                per further five officers. Pick the reading under Model.
+              </li>
+              <li>
+                A post marked as a bridge, where officers move traffic through gaps in the runners, gets extra
+                officers.
+              </li>
               <li>
                 Moving officers between posts is not modeled: in a 5K or 10K, no post closes before another
                 opens.
@@ -693,7 +724,12 @@
         <span class="footer-brand">ClearCourse <span>/ A civic planning experiment</span></span
         ><button id="footerSources">Read the model & data notes <span aria-hidden="true">↗</span></button
         ><button id="footerBuilt">How this was built <span aria-hidden="true">↓</span></button
-        ><a class="footer-github" href="https://github.com/Flying-Pig-Labs/clearcourse" target="_blank" rel="noopener noreferrer">Free, open source & not for profit — see the code on GitHub <span aria-hidden="true">↗</span></a
+        ><a
+          class="footer-github"
+          href="https://github.com/Flying-Pig-Labs/clearcourse"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Free, open source & not for profit — see the code on GitHub <span aria-hidden="true">↗</span></a
         ><span>Built for a conversation with the people who plan race day.</span>
       </footer>
     </main>
@@ -799,6 +835,40 @@
           ><label
             >Billed rate · $/officer-hour<input id="settingRate" type="number" min="0" max="1000" /></label
           ><label
+            >Traffic premium · $/hour<input
+              id="settingTrafficPremium"
+              type="number"
+              min="0"
+              max="100"
+              step="0.5" /></label
+          ><label
+            >Supervision rule<select id="settingSupervision">
+              <option value="table">RPD GO 04-06 examples</option>
+              <option value="perFive">RPD GO 04-06 text: +1 per 5</option>
+              <option value="off">Post officers only</option>
+            </select></label
+          ><label
+            >Supervisor premium · $/hour<input
+              id="settingSupervisorPremium"
+              type="number"
+              min="0"
+              max="100"
+              step="0.5" /></label
+          ><label
+            >Command premium · $/hour<input
+              id="settingCommandPremium"
+              type="number"
+              min="0"
+              max="100"
+              step="0.5" /></label
+          ><label
+            >Extra officers / bridge<input
+              id="settingBridgeOfficers"
+              type="number"
+              min="0"
+              max="20"
+              step="1" /></label
+          ><label
             >Minimum billed hours / officer<input
               id="settingMinimumShift"
               type="number"
@@ -847,7 +917,15 @@
             officer's personal hourly rate, the request is due at least 30 calendar days ahead, and RPD's
             Outside Employment Coordinator sets the number of officers. Nine or fewer fall under PD-119SE, due
             at least 7 working days ahead. The $85 billed rate is a placeholder until invoices calibrate it.
-            <strong>Billed officer-hours</strong> × rate = staffing cost.
+            <strong>Billed officer-hours</strong> × (rate + traffic premium) + supervision = staffing cost.
+            General Order 04-06 (04/03/2024) adds $5/hour when an officer's primary duty is traffic control
+            (§6f), pays on-site supervisors $3 and command officers $6 above the extra-duty rate (§6a), and
+            requires supervisors by officers on duty at the same time (§7c): 3–4 officers, one is paid as
+            supervisor; 5–10, one first-line supervisor; 11–15, two plus a lieutenant or above; 16 or more,
+            three plus a lieutenant in its examples, or one more supervisor per further five officers in its
+            text. The two readings agree up to 20 officers. Supervisors bill the whole event window.
+            <strong>Bridges</strong> are posts where officers work traffic across the course in gaps between
+            runners; a planner marks them per post, and each adds an illustrative extra officer.
           </p>
           <p>
             <strong>Full closure:</strong> all sites close before the start and reopen after the last finisher
@@ -971,7 +1049,11 @@
         <div class="model-fields">
           <label>Review category<select id="siteClass"></select></label
           ><label>Officers at this site<input id="siteOfficers" type="number" min="0" max="100" /></label
-          ><label>Total barricades<input id="siteBarriers" type="number" min="0" max="100" /></label>
+          ><label>Total barricades<input id="siteBarriers" type="number" min="0" max="100" /></label
+          ><label class="check-label"
+            ><input id="siteBridge" type="checkbox" /> Bridge: officers move traffic through gaps in the
+            runners</label
+          >
         </div>
         <label class="note-label"
           >Override reason (required)<textarea

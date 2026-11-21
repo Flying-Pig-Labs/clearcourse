@@ -48,7 +48,22 @@ Full closures use one shared pre-start to last-finisher window. Rolling estimate
 | RPD's Outside Employment Coordinator sets the number of officers                                       | PD-119SPE ¶11                                       |
 | 9 or fewer officers: PD-119SE lists $50/hour (+$6/hour for primary traffic control) as one rate option | PD-119SE (revised 07/14/2025)                       |
 
-Billed hours per officer = max(4, whole hours + 1 if the remainder exceeds 15 minutes). Cost = billed officer-hours × the billed rate. The $85 billed rate stays an illustrative placeholder, because personal hourly rates vary and no invoices are bundled. Because typical 5K/10K duty runs 1.2–2.4 hours, the 4-hour minimum sets billed hours for most posts; on the default Fan 5K the estimate rises from $11,921 in v3 to $20,400 (60 officers × 4 h × $85). The "Billing rule" setting can switch to modeled hours.
+Billed hours per officer = max(4, whole hours + 1 if the remainder exceeds 15 minutes). Cost = billed officer-hours × (billed rate + traffic premium) + supervision.
+
+**Supervision, premiums and bridges (version 4.2).** Richmond PD General Order 04-06 (04/03/2024), read on rva.gov on November 21, 2026:
+
+| Rule                                                                                                                                                 | Source         | Default                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------- |
+| +$5/hour when an officer's primary assignment is traffic control; also added to first-line supervisors                                               | §6f            | `trafficPremium: 5`                         |
+| On-site supervisors are paid $3 and command officers $6 above the extra-duty rate                                                                    | §6a            | `supervisorPremium: 3`, `commandPremium: 6` |
+| 3–4 officers: one officer is paid as supervisor. 5–10: 1 first-line supervisor. 11–15: 2 plus a lieutenant or above. 16 or more: 3 plus a lieutenant | §7b–c examples | `supervision: 'table'`                      |
+| "An additional supervisory officer shall be required for each multiple of five patrol officers"                                                      | §7c text       | `supervision: 'perFive'`                    |
+
+The order's text and its examples agree up to 20 officers and disagree above it: on the default Fan 5K (60 officers) the examples give 3 supervisors and a lieutenant, the text 11 and a lieutenant. The default is the examples; the Model dialog switches the reading or turns supervision off. Supervision is set by officers on duty at the same time (`peak`), and supervisors bill the whole event window under the same billing rule. A started hour and the 4-hour minimum apply to them too.
+
+A **bridge** is a post where officers move traffic across the course through gaps in the runners (Sports Backers' term; its 2026 River City Half course lists 27). A planner marks a post as a bridge in its review dialog; it adds `bridgeOfficers` (default 1, illustrative) to that post's officers, on top of any planner count, and carries the reason code `BRIDGE`.
+
+On the default Fan 5K the estimate is $23,080: $20,400 for post officers, $1,200 traffic premium and $1,480 supervision. With supervision off and a zero premium it is the version 4 figure. The $85 billed rate stays an illustrative placeholder, because personal hourly rates vary and no invoices are bundled. Because typical 5K/10K duty runs 1.2–2.4 hours, the 4-hour minimum sets billed hours for most posts; on the default Fan 5K the estimate rises from $11,921 in v3 to $20,400 (60 officers × 4 h × $85). The "Billing rule" setting can switch to modeled hours.
 
 Sessions saved before version 4 with the old minimum of 0 hours take the 4-hour minimum on load.
 
@@ -184,6 +199,10 @@ npm run test:ui          # 18 browser tests
 Use one past race and its real closure/staffing plan. Import its GPX, review detected junctions, replace default weights and staffing counts, assess route suitability, width, transit, construction, emergency and residential access, and compare predicted resources with the actual deployment. No staffing reduction is established by this prototype.
 
 Remaining production work includes operational staffing data, local validation, lane/width and turning-movement data, directional/capacity-aware access analysis, formally governed GIS refreshes, durable shared records, full immutable audit/version histories, and a constrained solver if the validated pilot warrants it. Type checking (for example JSDoc with `tsc --checkJs`) is not set up.
+
+## Version 4.2
+
+Adds RPD General Order 04-06 supervision tiers (two readings), the $5 traffic-control premium, supervisor and command differentials, and bridge posts. New settings: traffic premium, supervision rule, supervisor and command premiums, extra officers per bridge. The headline, the formula trace, the closure packet and "How this was built" show supervisors and bridges. Sessions keep a post's bridge flag. Model version 4.2.
 
 ## Version 4.1
 

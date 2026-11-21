@@ -234,8 +234,11 @@ function fixture() {
       sc.officers,
       sc.sites.reduce((a, s) => a + s.officers, 0)
     );
-    const expected = sc.sites.reduce((a, s) => a + s.officers * M.billedHours(s.hours), 0) * M.DEFAULTS.rate;
-    assert.ok(Math.abs(sc.cost - expected) < 1e-6);
+    const hours = sc.sites.reduce((a, s) => a + s.officers * M.billedHours(s.hours), 0);
+    assert.ok(Math.abs(sc.postCost - hours * M.DEFAULTS.rate) < 1e-6);
+    assert.ok(Math.abs(sc.trafficCost - hours * M.DEFAULTS.trafficPremium) < 1e-6);
+    assert.ok(Math.abs(sc.cost - sc.postCost - sc.trafficCost - sc.supervision.cost) < 1e-6);
+    assert.ok(sc.supervision.firstLine >= 1, 'A 5K with 10 or more officers needs supervision');
     assert.equal(sc.agreement.form, 'PD-119SPE');
   }
   // The UI says moving officers cannot help at 5K and 10K: no post closes before another opens.
